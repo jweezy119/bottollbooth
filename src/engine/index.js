@@ -1,19 +1,21 @@
 'use strict';
 
 /**
- * bot-tollbooth — traffic classification & ad-revenue impact engine
- * ----------------------------------------------------------------
- * The re-usable, dependency-free core of the plugin. It models the "math and
- * algorithms" behind a Bot Impact dashboard:
+ * bot-tollbooth — transparent traffic classification & business-impact engine
+ * ---------------------------------------------------------------------------
+ * The dependency-free open core of BotTollbooth. It models the "math and
+ * algorithms" behind transparent bot traffic analytics:
  *
  *   1. Classify individual request rows into human / bot categories using
- *      weighted signals (user-agent, behavioural fingerprint, rate, TLS/JA3).
- *   2. Roll those classifications up into period summaries.
- *   3. Estimate the ad-revenue that bot traffic costs a publisher, given the
- *      site's reported RPM (revenue per 1,000 impressions).
+ *      weighted signals (user-agent, behavioural fingerprint, rate, TLS/JA3)
+ *      and return the exact signal that produced each answer.
+ *   2. Roll those classifications up into period summaries by category.
+ *   3. Estimate the ad-revenue a publisher loses to bot traffic, given the
+ *      site's reported RPM (revenue per 1,000 impressions) and a conservative,
+ *      user-adjustable fill-scale assumption.
  *
  * This module intentionally has zero I/O — it is a pure function library so it
- * can be unit-tested in isolation and shared by the Cordis host half, a CLI, a
+ * can be unit-tested in isolation and shared by the web service, a CLI, a
  * scheduled job, or an API route. See ../docs/architecture.md.
  */
 

@@ -209,14 +209,14 @@
 <div class="container">
 
 <header>
-  <h1>🤖 Bot Traffic Impact Dashboard</h1>
-  <p class="sub">Live demo of the <a href="https://github.com/jweezy119/bottollbooth">BotTollbooth</a> classification engine. Everything runs in your browser — no server, no cookies, no tracking.</p>
+  <h1>🤖 Know Your Traffic — What's Real, What's Not</h1>
+  <p class="sub"><strong>BotTollbooth</strong> brings transparent traffic intelligence to the open web. See the true split between real visitors and bots, category by category, with every answer — and the business impact — laid out honestly. <a href="https://github.com/jweezy119/bottollbooth">Open source core</a>, free and self-hostable. This demo runs entirely in your browser.</p>
 </header>
 
 <!-- CONTROLS PANEL -->
 <div class="panel">
-  <div class="panel-title">⚙️ Configuration</div>
-  <div class="panel-desc">Adjust the traffic mix, monetization settings, and sample size. Hit <strong>Regenerate</strong> or change any slider to see the dashboard update.</div>
+  <div class="panel-title">⚙️ Configure Your Traffic Profile</div>
+  <div class="panel-desc">Model your own traffic — how much is real, what kind of bots you're seeing, and what your ad revenue would be worth if that bot traffic were real humans.</div>
 
   <div class="ctrl-grid">
     <div class="ctrl-group">
@@ -294,21 +294,21 @@
 <!-- METRICS PANEL -->
 <div class="panel" style="padding-bottom:12px">
   <div class="panel-title">📊 Traffic Summary</div>
-  <div class="panel-desc">Key numbers from the current sample. <strong>Recoverable Revenue</strong> = bot visitors that, if replaced with real humans, would earn your RPM at the fill scale you set above.</div>
+  <div class="panel-desc">Key numbers from your current traffic profile. <strong>Recoverable Revenue</strong> = the ad revenue being lost to bot traffic — what you'd earn if those were real humans. Every number shows its assumption, because transparency is the whole point.</div>
   <div class="metrics" id="metrics"></div>
 </div>
 
 <!-- TWO-COLUMN: BARS + TABLE -->
 <div class="two-col">
   <div class="panel">
-    <div class="panel-title">📈 Traffic by Category</div>
-    <div class="panel-desc">Count per classifier bucket. Bar width is relative to the largest bucket.</div>
+  <div class="panel-title">📈 Traffic by Category</div>
+  <div class="panel-desc">Who's actually visiting. Search engines and AI crawlers act differently from spam scrapers — not all bots are equal.</div>
     <div class="bars" id="bars"></div>
   </div>
 
   <div class="panel">
-    <div class="panel-title">📋 Category Details</div>
-    <div class="panel-desc">What each bucket means and how the classifier identified it.</div>
+  <div class="panel-title">📋 Category Details</div>
+  <div class="panel-desc">What each bucket means and how we identified it — no black box. You can verify every classification.</div>
     <table class="cat-table">
       <thead><tr><th>Category</th><th>Count</th><th>%</th><th>Identified by</th></tr></thead>
       <tbody id="cat-tbody"></tbody>
@@ -318,8 +318,8 @@
 
 <!-- CLASSIFY YOUR OWN -->
 <div class="panel">
-  <div class="panel-title">🔍 Classify Your Own User-Agent</div>
-  <div class="panel-desc">Paste any user-agent string and see how the engine classifies it in real time.</div>
+  <div class="panel-title">🔍 Classify Any User-Agent</div>
+  <div class="panel-desc">Paste any user-agent string and see exactly how we classify it — with the confidence and the signal that produced the answer.</div>
   <div class="custom-ua">
     <input type="text" id="customUA" placeholder="e.g. GPTBot/1.0 (+https://openai.com/gptbot)">
     <button class="btn-small" id="classifyBtn">Classify</button>
@@ -339,12 +339,12 @@
 
 <!-- REQUEST LOG -->
 <div class="panel">
-  <div class="panel-title">🔎 Last 25 Classified Requests</div>
-  <div class="panel-desc">Most recent requests in the sample, newest first. Shows the exact UA, classifier result, and confidence.</div>
+  <div class="panel-title">🔎 Classified Requests (Live)</div>
+  <div class="panel-desc">The most recent requests in your traffic profile, newest first — the exact user agent, our verdict, and how confident we are.</div>
   <div class="request-log" id="log"></div>
 </div>
 
-<p class="footer">BotTollbooth v1.0 · Classification engine + Cordis plugin for <a href="https://github.com/deepseek-ai/deepseek-harness">DeepSeek Harness</a> · <a href="https://github.com/jweezy119/bottollbooth">GitHub</a> · MIT License · Syed Jawad Hussain</p>
+<p class="footer">BotTollbooth — transparent traffic intelligence for the open web · Open source core · <a href="https://github.com/jweezy119/bottollbooth">GitHub</a> · MIT License · Syed Jawad Hussain</p>
 
 </div>
 

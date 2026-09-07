@@ -1,75 +1,84 @@
-# Monetization analysis (the honest version)
+# Monetization & business model — fair, not predatory
 
-This file exists because the most valuable decision made on this project was
-the decision **not** to chase the flashy commercial idea first. Reproducing
-that reasoning makes the repo useful and keeps it honest.
+This file is the strategy behind **who pays, why, and how much** — built
+around the core belief that incumbent "fraud detection" pricing is broken,
+and small-business owners are the ones getting scoured.
 
-## What was originally proposed (and why it's a trap)
+## The market problem (why this exists)
 
-The first framing was a "tollbooth": charge AI companies per crawler request
-(GPTBot, ClaudeBot, Google-Extended…) with tiered per-request rates and a
-revenue split. The reasons that fails:
+Enterprise bot/fraud-detection platforms (DoubleVerify, Integral Ad Science)
+set the industry norm: **opaque and expensive**. Their model depends on the
+customer being able to verify as little as possible, so a rising bot figure
+justifies a rising subscription.
 
-- **Detection is ~85–95% accurate at best.** Charging real money on a
-  ~10% error rate means billing real humans for someone else's bots.
-- **Residential proxies defeat IP-based charging.** Bot operators replay real
-  browser UAs from real IPs; UA-tiering becomes a trivial spoofing exercise.
-- **No enforcement layer.** How do you collect? No API key, no payment
-  infra, no legal basis to bill a crawler that ignores `robots.txt`.
-- **The market moved the other way.** AI companies increasingly *pay
-  publishers* (licensing deals) rather than being charged for crawling.
-- **Cloudflare, DoubleVerify, Integral Ad Science already own the space**
-  with native or entrenched detection.
-- **Cordis dynamic plugins can't hold money.** No billing, no persistence
-  of user accounts, no checkout. Any "charge the site owner" path would
-  require payment infra the plugin runtime doesn't provide.
+The side of the internet that actually needs ground truth — **small and
+mid-sized businesses** with a website, Adsense/Mediavine revenue, and
+marketing budgets — gets:
 
-## What survives the honest cut
+- **Inflated prices** for tools built for enterprise scale they don't need.
+- **Opaque metrics** that distort their marketing decisions (they optimize
+  for channels that look great because bots inflated the numbers).
+- **No way to verify** what these tools report, so they're captive.
 
-| Idea | Verdict | Why |
-| --- | --- | --- |
-| Charge AI crawlers per request | ❌ Rejected | enforcement + accuracy + legal |
-| Replace Cloudflare bot detection | ❌ Rejected | incumbent, free token |
-| "Recover" ad revenue ourselves | ❌ Rejected | requires ad-network partnership |
-| **Bot impact analytics dashboard** | ✅ **Built** | visibility is real value, low friction |
-| **Affiliate CTA (Cloudflare)** | ✅ **Built** | least-friction zero-capital revenue path |
+BotTollbooth's position: **transparency is the product, and it should be
+cheap enough that any site owner can afford it — or run it free themselves.**
 
-The **summarized** value proposition became:
+## What we refuse to do
 
-> *"X% of your traffic is bots, costing you ~$Y / month in ad revenue."*
+| Tempting idea | Why we reject it |
+| --- | --- |
+| "Charge AI companies per crawler request" | Enforcement, accuracy, and legal problems; also the market moved the other way (AI companies *pay* publishers to license content). |
+| "Recover" ad revenue and take a cut | Requires ad-network partnerships and inflates our incentive to over-report. |
+| Lock the detection logic behind a black box | The opposite of our positioning — kills trust. |
+| Price like the incumbents | Contradicts the whole reason we exist. |
 
-That's a business metric a small publisher can act on — and it's the same
-information that motivates a Cloudflare Pro/Business consideration, which is
-where the affiliate CTA comes in.
+## How we actually make money (fair paths)
 
-## Least-friction paths from zero capital (time-to-dollar)
+### 1. The open core (this repo)
+MIT-licensed, self-hostable, free forever. This is our **trust engine** — it
+proves we're not hiding anything. Anyone can verify every number.
 
-| Path | Time to first dollar | Capital | Month-1 ceiling |
-| --- | --- | --- | --- |
-| Plugin affiliate (this repo, CTA) | 3–6 mo | $0 | ~$50–200 |
-| **Plugin as lead-gen for a paid analysis service** | **1–4 weeks** | **$0** | **$500–2,500** |
-| Consulting (your algorithms as the deliverable) | 1–2 weeks | $0 | $500–5,000 |
-| Aggregated anonymized traffic insights | 3–6 mo | $0 | later B2B |
+### 2. Managed service (fair, flat pricing)
+For owners who don't want to run infrastructure. Set up, host, and maintain
+the pipeline for a **small, flat monthly fee** — a fraction of enterprise
+pricing, tiered by traffic volume, with a **free tier** for small sites.
 
-The realistic play: use the dashboard as the *demo*, sell "bot impact
-analysis + mitigation recommendations" as the paid service, and let the
-affiliate CTA be a passive tail. The dashboard is the lead magnet; the
-algorithms are the moat.
+### 3. Agency layer
+Many marketing agencies already manage dozens of client sites. A multi-tenant
+dashboard + scheduled reports + alerting ("This client's bot rate jumped to
+40%") is a genuine win for them and their clients — and agencies pay for
+tools that demonstrably protect their clients' ad spend.
 
-## The math that actually matters
+### 4. Growth via trust, not lock-in
+Because the core is open, an owner who outgrows us can self-host and walk
+away. That's unusual and it is precisely why owners/agencies trust the
+numbers. **Retention comes from being the honest option.**
 
-`revenueImpact()` in `src/host/engine.js`:
+## Positioning vs Cloudflare
 
-```
-recoveredMonthly ≈ botVisitors / 1000 × rpm × fillScale
-```
+Cloudflare is a **CDN/security** company with bot detection as a feature.
+BotTollbooth is a **traffic-transparency and analytics** company — it works
+alongside Cloudflare, AdSense, GA4 and tells the owner the business-facing
+story those platforms don't: *what is real, what is not, what drives
+revenue, what doesn't.*
 
-- `botVisitors` — non-human sampled visits in the period
-- `rpm` — publisher's reported revenue per 1,000 monetized impressions
-- `fillScale ≈ 0.5` — conservative: most bot traffic never renders a
-  monetized/valid impression, so we discount the "recovered" figure
+## The open-core economics, honestly
 
-This is deliberately **conservative**. Understating recovery is a feature:
-it keeps the number defensible (which is what makes it a good consulting
-artifact) and avoids the over-promise-and-under-deliver trap that kills zero-
-capital projects.
+Open + self-hostable means our **core revenue is the managed service and
+agency layer**, not licenses. That's fine: it keeps the trust engine honest
+and gives us a defensible, non-predatory business. The moat is verification
+and fair pricing, not secrecy.
+
+## What this means for the author's resume
+
+This business model demonstrates the exact skills hiring managers in
+security/IAM/integrations/marketing-technology roles look for:
+
+- **Identity & classification thinking** — "is this request real and who is
+  it" applied to web traffic.
+- **B2B product judgement** — rejecting a flashy-but-broken idea (charging
+  bots) in favour of a defensible one.
+- **Honesty as a strategy** — open core + fair pricing as a competitive
+  moat, not just a value statement.
+- **Marketing-tech literacy** — RPM, impression fill, bot rate, and how
+  these distort marketing decisions.

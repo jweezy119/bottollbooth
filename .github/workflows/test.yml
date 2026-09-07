@@ -13,7 +13,13 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-      - name: Run smoke test
-        run: node test/engine.test.js
+      - name: Run engine + service smoke tests
+        run: npm test
       - name: Run demo
         run: node examples/demo.js --rpm 15
+      - name: Boot analytics service and hit the API
+        run: |
+          node src/service/server.js & API_PID=$!
+          sleep 2
+          curl -fsS http://localhost:8080/health
+          kill $API_PID

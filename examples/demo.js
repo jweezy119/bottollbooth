@@ -4,16 +4,16 @@
 /**
  * bot-tollbooth — demo CLI
  * ------------------------
- * Standalone demo of the Traffic Classification + Ad-Revenue Impact engine.
- * No DSH/Cordis required: this runs the same pure algorithm that the Cordis
- * host half invokes over JSON-RPC, so you can see the math without a harness.
+ * Standalone demo of the Transparent Traffic Classification + Ad-Revenue
+ * Impact engine. No server required: run the exact same algorithm the
+ * analytics service uses, so anyone can verify the math on their own box.
  *
  * Usage:
  *   node examples/demo.js                  # run with a built-in sample feed
  *   node examples/demo.js --rpm 25         # tune publisher RPM
  */
 
-const { summarize, revenueImpact, classify } = require('../src/host/engine.js');
+const { summarize, revenueImpact, classify } = require('../src/engine/index.js');
 
 const SAMPLE_FEED = [
   { userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/126 Safari/537.36' },

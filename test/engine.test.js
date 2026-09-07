@@ -12,7 +12,7 @@ const {
   summarize,
   revenueImpact,
   CATEGORIES,
-} = require('../src/host/engine.js');
+} = require('../src/engine/index.js');
 
 const cases = [
   ['GPTBot/1.0', CATEGORIES.AI_CRAWLER],

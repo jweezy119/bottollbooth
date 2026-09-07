@@ -1,92 +1,89 @@
-# Architecture: host / client halves and how they talk
+# Architecture — a transparent traffic-intelligence service
 
-BotTollbooth is a **dynamic Cordis plugin** inside DeepSeek Harness. "Dynamic"
-means the plugin's code is a plain-JavaScript function body written at runtime
-and mounted through the harness' own Cordis toolset — not a statically packed
-npm dependency. The runner that installed and operated it is
-`@deepseek-ai/dsh-cordis-host-runner` + `@deepseek-ai/dsh-cordis-client-runner`
-(via `@deepseek-ai/dsh-tool-cordis`), all part of the open-source
-`@deepseek-ai/dsh-*` profile the session runs on.
+BotTollbooth is a **self-hosted web service** that a site owner wires into
+their website (or hosting provider / CDN) to get transparent answers about
+their traffic. This design is deliberately boring and cheap:
 
-## Two halves, one process boundary
+- **Zero server-side dependencies** — only Node.js built-ins. Deployable to a
+  $5 VPS, Cloud Run, Lambda, Fly.io, or on-prem with no lock-in.
+- **Privacy-preserving by default** — only classification *counts by
+  category* are retained, never raw user agents, never PII, no cookies, no
+  fingerprint storage.
+- **Transparent at every layer** — the classification engine returns the
+  exact signal that produced each answer, and the revenue math spells out its
+  assumptions (RPM, fill scale) instead of hiding them in a black box.
+
+## Components
 
 ```
-┌─────────────────────────────┐          ┌──────────────────────────────┐
-│  HOST HALF (Node.js)        │          │  CLIENT HALF (Browser)       │
-│                             │          │                              │
-│  inject: ['botDetection']   │   JSON-   │  inject: ['slots','theme',  │
-│  harness.handle('...')      │ ──RPC──▶ │   'host']                    │
-│  ctx.on('botDetection/...') │ ◀────────│  host.call('botDetection.  │
-│  ctx.effect(...)            │          │   summary', {period})       │
-│                             │          │  slots.inject('tool.view.   │
-│                             │          │   cordis', ...)             │
-└─────────────────────────────┘          └──────────────────────────────┘
+┌──────────────────────────────────────────────────────────────┐
+│  Site owners (your website / CDN / server logs)               │
+│        │                                                      │
+│        ▼  POST /api/v1/ingest   { namespace, rows }           │
+│  ┌──────────────────────────────────────────────────────┐    │
+│  │  src/service/ingest.js                               │    │
+│  │   • normalise each request row                        │    │
+│  │   • classify via src/engine/index.js                  │    │
+│  │   • keep only category counts (privacy)               │    │
+│  └─────────────────────────┬────────────────────────────┘    │
+│                            │                                  │
+│                            ▼  GET /api/v1/report              │
+│  ┌──────────────────────────────────────────────────────┐    │
+│  │  src/service/server.js                              │    │
+│  │   • aggregates per-namespace summary                 │    │
+│  │   • computes conservative revenue-impact estimate    │    │
+│  └──────────────────────────────────────────────────────┘    │
+│        │                                                      │
+│        ▼  JSON → dashboard (index.html) / SMB owner           │
+└──────────────────────────────────────────────────────────────┘
 ```
 
-- The **host half** runs in the DSH host process (Node.js side). It holds the
-  in-memory request feed and registers package-private JSON-RPC methods.
-- The **client half** runs in the browser page's client-runner world. It has
-  **no** `fetch`, no `window`, no `import` — it gets a seat in the UI via
-  `ctx.slots`, reads the theme via `ctx.theme`, and talks to the host over the
-  harness' JSON-RPC bridge via `ctx.host.call`.
-- Session scoping: the host halves scope their feed per `ctx.sessionId`, and
-  the `tool.view.cordis` slot is `scope: 'session'`. Nothing leaks across
-  sessions.
+## Data flow
 
-## Cordis plugin-body shape
+1. **Ingest** — the site sends a batch of request rows
+   (`{ userAgent, behaviourScore?, requestsPerMin?, dwellMs? }`).
+2. **Classify** — `src/engine/index.js` classifies each row into a category
+   (`human`, `ai-crawler`, `search-engine`, `spam`, `monitoring`,
+   `unclassified`) with a confidence and the signal that produced it.
+3. **Store counts only** — for privacy and cost, we persist
+   `{ category, confidence, at }` and nothing else. A production build swaps
+   the in-memory `Map` for Postgres/Redis with the same shape.
+4. **Aggregate** — `aggregate(namespace, rpm, fillScale)` rolls counts up into
+   a period summary and a revenue-impact estimate.
 
-Both bodies return a Cordis plugin object:
+## The revenue math (honest by construction)
 
-```js
-function myBody() {
-  return {
-    inject: ['some.service'],   // hard dependency: activation blocks until present
-    apply(ctx) {                // ctx is the scoped Cordis context
-      // ctx.on / ctx.effect / harness.handle ...
-    },
-  };
-}
+```
+recoveredMonthly ≈ botVisitors / 1000 × rpm × fillScale
 ```
 
-The constraints are deliberate and enforced by the runner:
+- `botVisitors` — non-human sampled visits in the period.
+- `rpm` — the owner's revenue per 1,000 monetized impressions.
+- `fillScale` — the fraction of that revenue bot traffic actually earns.
+  Defaults to **50%** and is user-adjustable, because most bot traffic never
+  renders a valid, monetized impression. We understate rather than overstate —
+  a defensible number beats a hype number every time.
 
-- **No TypeScript, no JSX, no imports/exports** inside the body — the body is
-  evaluated as plain JS.
-- React UI is written with `React.createElement(...)` only.
-- Effects must be owned (return a cleanup from `ctx.effect`) so that
-  `cordis_stop` / `cordis_run --update` tear down cleanly.
+## Why self-hosted + MIT core
 
-## Slot registration (`tool.view.cordis`)
+The incumbents sell *opacity*: the less a customer can verify, the more a
+subscription is worth. BotTollbooth inverts that. Because the core is open
+and self-hostable, any owner — or their agency — can see exactly how a number
+was produced. That position is the product: **transparency as the moat**.
 
-The Package-owned region rendered inside the latest eligible `cordis_run`
-card. Per the shipped slot contract, dynamic client code registers with
-`key: 'self'`:
+## Deployment options
 
-```js
-ctx.slots.inject('tool.view.cordis', () =>
-  ctx.slots.register(
-    { name: 'tool.view.cordis', key: 'self' },
-    () => React.createElement('div', null, '…'),
-  ),
-);
-```
+| Target | How |
+| --- | --- |
+| Local / dev | `npm start` |
+| Cloud Run / Fly.io / VPS | run `src/service/server.js` with `PORT` env; add a reverse proxy |
+| Function (Lambda / Workers) | wrap `ingest()` / `aggregate()` in the framework handler of your choice |
+| Edge / CDN | the same endpoint handed off to Cloudflare Workers or a CDN worker |
 
-The Guard binds `key: 'self'` to the current Plugin+Package, so the business
-view always renders for the right package even when several exist.
+## Todo / roadmap (real integrations)
 
-## Lifecycle (what the README glosses over)
-
-All of it is driven by the model-facing tools `cordis_define`, `cordis_run`,
-`cordis_stop`, `cordis_undefine`, `cordis_inspect_*`:
-
-1. `cordis_define` — records an **immutable Package** (`code.host` /
-   `code.client`), validates syntax, does **not** execute it.
-2. `cordis_run` — activates a Package; an unauthorized client half becomes an
-   **approval request**, otherwise activation continues asynchronously.
-3. `cordis_stop` / `cordis_undefine` — stop the run, or permanently remove the
-   plugin and all its packages.
-
-`currentPackageId` advances only on complete success; failed targets stay as
-`nextPackageId` and can be re-run. This is what makes the whole thing
-iterable — we shipped `pkg-1` → `pkg-7` across one session without ever
-breaking the runtime.
+- Postgres/Redis store behind the same `buckets` interface.
+- Adapter for common inputs: Google Analytics 4 export, Cloudflare logs, raw
+  Nginx/Apache access logs, a drop-in JS snippet.
+- Scheduled period rollups and a simple alerting hook ("bot rate > 40%").
+- Multi-namespace admin webbook for agencies managing many client sites.
