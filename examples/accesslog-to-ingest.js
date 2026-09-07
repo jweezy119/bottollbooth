@@ -22,6 +22,7 @@
  *
  * CLI usage:
  *   node examples/accesslog-to-ingest.js access.log
+ *   node examples/accesslog-to-ingest.js --file access.log --limit 100
  *   node examples/accesslog-to-ingest.js access.log --namespace shop.com
  *   node examples/accesslog-to-ingest.js access.log --post http://localhost:8080
  *   cat access.log | node examples/accesslog-to-ingest.js --post http://localhost:8080
@@ -157,8 +158,7 @@ function postBatch(url, namespace, rows) {
   });
 }
 
-function readInput() {
-  const file = process.argv[2];
+function readInput(file) {
   if (file === undefined) return fs.readFileSync(0, 'utf8'); // stdin
   return fs.readFileSync(file, 'utf8');
 }
@@ -176,12 +176,23 @@ async function main() {
     const i = args.indexOf(k);
     return i >= 0 ? args[i + 1] : undefined;
   };
+  const VALUED = new Set(['--namespace', '--post', '--limit', '--file']);
+  const positional = [];
+  for (let i = 0; i < args.length; i++) {
+    const a = args[i];
+    if (a.startsWith('-')) {
+      if (VALUED.has(a)) i += 1;
+      continue;
+    }
+    positional.push(a);
+  }
 
   const namespace = opt('--namespace') || 'site';
   const postUrl = opt('--post');
   const limit = Number(opt('--limit') || 0);
+  const file = opt('--file') || positional[0];
 
-  const text = await readInput();
+  const text = await readInput(file);
   if (!text.trim()) {
     console.error('no input — pass a log file or pipe one in');
     if (postUrl) console.error('  $ node examples/accesslog-to-ingest.js access.log --post http://localhost:8080');
