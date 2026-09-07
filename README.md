@@ -161,15 +161,15 @@ flyctl deploy
 flyctl open                           # https://bottollbooth.fly.dev/app
 ```
 
-**Automatic deploys:** the repo's `test` workflow runs on every push; when it
-passes on `main`, the `deploy` workflow deploys automatically. For CI to push
-to Fly you need one GitHub secret:
+**Automatic deploys:** the repo's `test` workflow runs on every push; a
+`deploy` job in that same workflow pushes to Fly.io after tests pass on `main`
+(remote builder, no local Docker needed). Until you add a GitHub secret, the
+job is skipped automatically:
 
 1. Create a personal access token at <https://fly.io/user/personal_access_tokens>.
 2. Add it to the repo as a secret named `FLY_API_TOKEN`
    (Settings → Secrets → Actions).
-3. Push to `main` — deploys happen automatically, or trigger one by hand from
-   the Actions tab (`workflow_dispatch`).
+3. Push to `main` — this deploys automatically.
 
 `flyctl destroy` also deletes the app (and stops billing) when you're done.
 If the name `bottollbooth` is taken, pick another in `flyctl launch --name`.

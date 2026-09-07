@@ -90,3 +90,19 @@ jobs:
             exit 1
           fi
           docker stop bottollbooth-ci
+
+  # Deploy to Fly.io after tests pass on main. Skipped until the repo has a
+  # FLY_API_TOKEN secret (see the "Deploy to Fly.io" section in the README).
+  deploy:
+    runs-on: ubuntu-latest
+    needs: engine
+    if: github.ref == 'refs/heads/main' && !cancelled() && github.event_name == 'push' && secrets.FLY_API_TOKEN != ''
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+      - name: Deploy to Fly.io (remote builder)
+        run: flyctl deploy --remote-only --yes
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
