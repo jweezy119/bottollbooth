@@ -21,6 +21,13 @@ const cases = [
   ['CCBot/2.0', CATEGORIES.AI_CRAWLER],
   ['UptimeRobot/2.0', CATEGORIES.MONITORING],
   ['python-requests/2.32.3', CATEGORIES.SPAM],
+  ['Mozilla/5.0 Meta-ExternalAgent/1.0', CATEGORIES.AI_CRAWLER],
+  ['Mozilla/5.0 (compatible; Bytespider; spider-feedback@bytedance.com)', CATEGORIES.AI_CRAWLER],
+  ['Amazonbot/0.1 (+https://developer.amazon.com/amazonbot)', CATEGORIES.AI_CRAWLER],
+  ['Applebot-Extended/1.0', CATEGORIES.AI_CRAWLER],
+  ['OAI-SearchBot/1.0', CATEGORIES.AI_CRAWLER],
+  ['Claude-Web', CATEGORIES.AI_CRAWLER],
+  ['Mozilla/5.0 (compatible; Applebot/0.1; +http://www.apple.com/go/applebot)', CATEGORIES.SEARCH_ENGINE],
 ];
 
 for (const [ua, expected] of cases) {

@@ -5,7 +5,7 @@
   "private": true,
   "license": "MIT",
   "scripts": {
-    "test": "node test/engine.test.js && node test/service.test.js",
+    "test": "node test/engine.test.js && node test/importer.test.js && node test/demo.test.js && node test/service.test.js",
     "demo": "node examples/demo.js",
     "start": "node src/service/server.js"
   },

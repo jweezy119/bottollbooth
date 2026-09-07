@@ -183,6 +183,18 @@
   .classify-result .cr-row { display: flex; gap: 16px; align-items: center; }
   .classify-result .cr-label { color: var(--subtle); font-size: 0.75em; }
 
+  /* Profile selector + share */
+  .profile-row { margin-bottom: 14px; }
+  .profile-row select {
+    width: 100%; padding: 9px 12px; border-radius: var(--radius-sm);
+    border: 1px solid var(--border); background: var(--surface-alt);
+    font-size: 0.85em; font-family: inherit; color: var(--text); outline: none; cursor: pointer;
+  }
+  .profile-row select:focus { border-color: var(--accent); background: var(--surface); }
+  .profile-desc { font-size: 0.74em; color: var(--subtle); margin-top: 6px; }
+  .share-row { display: flex; align-items: center; gap: 10px; margin-top: 6px; flex-wrap: wrap; }
+  .share-note { font-size: 0.75em; color: var(--green); font-weight: 500; }
+
   /* Request log */
   .request-log {
     max-height: 320px; overflow-y: auto; font-family: 'JetBrains Mono', 'Fira Code', monospace;
@@ -216,7 +228,17 @@
 <!-- CONTROLS PANEL -->
 <div class="panel">
   <div class="panel-title">⚙️ Configure Your Traffic Profile</div>
-  <div class="panel-desc">Model your own traffic — how much is real, what kind of bots you're seeing, and what your ad revenue would be worth if that bot traffic were real humans.</div>
+  <div class="panel-desc">Start from a real-world traffic profile, or tune the mix yourself — how much is real, what kind of bots you're seeing, and what your ad revenue would be worth if that bot traffic were real humans.</div>
+
+  <div class="profile-row">
+    <select id="profile">
+      <option value="custom">Custom mix (tune below)</option>
+      <option value="local-business">Local Business (Coffee Shop)</option>
+      <option value="ecommerce">E-commerce</option>
+      <option value="editorial">Editorial / News</option>
+    </select>
+    <div class="profile-desc" id="profileDesc">Every answer shows its assumption — transparency is the whole point.</div>
+  </div>
 
   <div class="ctrl-grid">
     <div class="ctrl-group">
@@ -248,6 +270,14 @@
       <div class="ctrl-row">
         <input type="range" id="searchWeight" min="1" max="20" value="10" step="1">
         <span class="ctrl-value" id="searchWeight-val">10</span>
+      </div>
+    </div>
+
+    <div class="ctrl-group">
+      <span class="ctrl-label">Monitoring weight <span class="info" data-tip="How often uptime/status bots (UptimeRobot, Pingdom) appear relative to other bots">?</span></span>
+      <div class="ctrl-row">
+        <input type="range" id="monWeight" min="0" max="10" value="2" step="1">
+        <span class="ctrl-value" id="monWeight-val">2</span>
       </div>
     </div>
 
@@ -288,6 +318,11 @@
     <div class="ctrl-group" style="justify-content:flex-end">
       <button class="btn-primary" id="rerun">↻ Regenerate</button>
     </div>
+  </div>
+
+  <div class="share-row">
+    <button class="btn-small" id="shareLink">🔗 Copy Report Link</button>
+    <span class="share-note" id="shareNote"></span>
   </div>
 </div>
 
@@ -348,18 +383,23 @@
 
 </div>
 
+<script src="data/samples/profiles.js"></script>
 <script>
 // ==============================
-// ENGINE — inlined from src/host/engine.js
+// ENGINE — inlined from src/engine/index.js
 // ==============================
 var UA_RULES=[
   {c:'ai-crawler',p:/\bGPTBot\b/i},{c:'ai-crawler',p:/\bChatGPT-User\b/i},
   {c:'ai-crawler',p:/\bClaudeBot\b/i},{c:'ai-crawler',p:/\bAnthropic-AI\b/i},
   {c:'ai-crawler',p:/\bGoogle-Extended\b/i},{c:'ai-crawler',p:/\bCCBot\b/i},
   {c:'ai-crawler',p:/\bPerplexityBot\b/i},{c:'ai-crawler',p:/\bcohere-ai\b/i},
+  {c:'ai-crawler',p:/\bClaude-Web\b/i},{c:'ai-crawler',p:/\bOAI-SearchBot\b/i},
+  {c:'ai-crawler',p:/\bMeta-ExternalAgent\b/i},{c:'ai-crawler',p:/\bBytespider\b/i},
+  {c:'ai-crawler',p:/\bAmazonbot\b/i},{c:'ai-crawler',p:/\bApplebot-Extended\b/i},
+  {c:'ai-crawler',p:/\bDuckAssistBot\b/i},
   {c:'search-engine',p:/\bGooglebot\b/i},{c:'search-engine',p:/\bingbot\b/i},
   {c:'search-engine',p:/\bDuckDuckBot\b/i},{c:'search-engine',p:/\bYandexBot\b/i},
-  {c:'search-engine',p:/\bBaiduspider\b/i},
+  {c:'search-engine',p:/\bBaiduspider\b/i},{c:'search-engine',p:/\bApplebot\b/i},
   {c:'monitoring',p:/\bUptimeRobot\b/i},{c:'monitoring',p:/\bStatusCake\b/i},
   {c:'monitoring',p:/\bPingdom\b/i},
   {c:'spam',p:/\bSemrushBot\b/i},{c:'spam',p:/\bAhrefsBot\b/i},
@@ -406,20 +446,25 @@ var HUMAN_UAS=[
 ];
 
 var AI_UAS=[
-  {ua:'GPTBot/1.0 (+https://openai.com/gptbot)',w:1},
+  {ua:'GPTBot/1.2 (+https://openai.com/gptbot)',w:1},
   {ua:'ChatGPT-User/1.0 (+https://openai.com/bot)',w:1},
   {ua:'ClaudeBot/1.0 (+https://anthropic.com/claude-bot)',w:1},
   {ua:'Google-Extended/1.0',w:1},
   {ua:'CCBot/2.0 (https://commoncrawl.org/faq/)',w:1},
   {ua:'PerplexityBot/1.0 (+https://perplexity.ai/bot)',w:1},
-  {ua:'cohere-ai (+https://cohere.com/bot)',w:1}
+  {ua:'cohere-ai (+https://cohere.com/bot)',w:1},
+  {ua:'Amazonbot/0.1 (+https://developer.amazon.com/amazonbot)',w:1},
+  {ua:'Mozilla/5.0 (compatible; Bytespider; spider-feedback@bytedance.com)',w:1},
+  {ua:'OAI-SearchBot/1.0',w:1},
+  {ua:'Mozilla/5.0 Meta-ExternalAgent/1.0',w:1}
 ];
 
 var SEARCH_UAS=[
   {ua:'Googlebot/2.1 (+http://www.google.com/bot.html)',w:1},
   {ua:'Mozilla/5.0 (compatible; bingbot/2.0; +http://www.bing.com/bingbot.htm)',w:1},
   {ua:'DuckDuckBot/1.0 (+https://duckduckgo.com/duckduckbot.html)',w:1},
-  {ua:'Mozilla/5.0 (compatible; YandexBot/3.0; +http://yandex.com/bots)',w:1}
+  {ua:'Mozilla/5.0 (compatible; YandexBot/3.0; +http://yandex.com/bots)',w:1},
+  {ua:'Mozilla/5.0 (compatible; Applebot/0.1; +http://www.apple.com/go/applebot)',w:1}
 ];
 
 var SPAM_UAS=[
@@ -432,30 +477,56 @@ var MONITOR_UAS=[
   {ua:'UptimeRobot/2.0',w:1},{ua:'StatusCakeBot/1.0',w:1},{ua:'Pingdom/1.0',w:1}
 ];
 
-function pickOne(arr){return arr[Math.floor(Math.random()*arr.length)].ua;}
+// Weighted picker so profiles can tune how common each crawler is
+function pickOne(arr){
+  var total=0,i;
+  for(i=0;i<arr.length;i++)total+=(arr[i].w||1);
+  var r=nextRandom()*total;
+  for(i=0;i<arr.length;i++){r-=(arr[i].w||1);if(r<=0)return arr[i].ua;}
+  return arr[arr.length-1].ua;
+}
+
+// Deterministic PRNG: a shared link reproduces the exact same dataset (the
+// whole transparency promise — anyone can verify the exact numbers).
+var rngActive=null;
+function nextRandom(){return rngActive?rngActive():Math.random();}
+function xmur3(str){
+  var h=1779033703^str.length,i;
+  for(i=0;i<str.length;i++){h=Math.imul(h^str.charCodeAt(i),3432918353);h=h<<13|h>>>19;}
+  return function(){h=Math.imul(h^(h>>>16),2246822507);h=Math.imul(h^(h>>>13),3266489909);return (h^=h>>>16)>>>0;};
+}
+function mulberry32(a){
+  return function(){a|=0;a=a+0x6D2B79F5|0;var t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};
+}
+var seedSource=null;
+function reseed(){
+  if(seedSource){var h=xmur3(seedSource);rngActive=mulberry32(h());}
+  else rngActive=null;
+}
 
 function generate(cfg){
   var n=cfg.count;
   var hPct=cfg.humanPct/100;
   var botPct=1-hPct;
-  // distribute bot pct across sub-categories by their weights
-  var wTotal=cfg.aiWeight+cfg.spamWeight+cfg.searchWeight+2; // +2 for monitoring baseline
+  var mw=cfg.monWeight||2;
+  var wTotal=cfg.aiWeight+cfg.spamWeight+cfg.searchWeight+mw;
   var aiFrac=cfg.aiWeight/wTotal;
   var spamFrac=cfg.spamWeight/wTotal;
   var searchFrac=cfg.searchWeight/wTotal;
-  var monFrac=2/wTotal;
+  var monFrac=mw/wTotal;
+  var pools=cfg.pools||{ai:AI_UAS,search:SEARCH_UAS,spam:SPAM_UAS,mon:MONITOR_UAS};
 
   var rows=[];
   for(var i=0;i<n;i++){
-    var r=Math.random();
+    var r=nextRandom();
     if(r<hPct){
-      rows.push({userAgent:pickOne(HUMAN_UAS),dwellMs:5000+Math.random()*120000});
+      rows.push({userAgent:pickOne(HUMAN_UAS),dwellMs:5000+nextRandom()*120000});
     } else {
       var botR=(r-hPct)/botPct;
-      if(botR<aiFrac) rows.push({userAgent:pickOne(AI_UAS)});
-      else if(botR<aiFrac+spamFrac) rows.push({userAgent:pickOne(SPAM_UAS),requestsPerMin:Math.random()>0.7?5+Math.random()*80:0});
-      else if(botR<aiFrac+spamFrac+searchFrac) rows.push({userAgent:pickOne(SEARCH_UAS)});
-      else rows.push({userAgent:pickOne(MONITOR_UAS)});
+      if(botR<aiFrac) rows.push({userAgent:pickOne(pools.ai)});
+      else if(botR<aiFrac+spamFrac) rows.push({userAgent:pickOne(pools.spam),requestsPerMin:nextRandom()>0.7?5+nextRandom()*80:0});
+      else if(botR<aiFrac+spamFrac+searchFrac) rows.push({userAgent:pickOne(pools.search)});
+      else rows.push({userAgent:pickOne(pools.mon)});
     }
   }
   return rows;
@@ -464,9 +535,12 @@ function generate(cfg){
 // ==============================
 // STATE
 // ==============================
+var DEFAULT_POOLS={ai:AI_UAS,search:SEARCH_UAS,spam:SPAM_UAS,mon:MONITOR_UAS};
+
 var STATE={
-  humanPct:55, aiWeight:8, spamWeight:4, searchWeight:10,
-  rpm:15, fillScale:50, count:2000, period:'30d', rows:[]
+  humanPct:55, aiWeight:8, spamWeight:4, searchWeight:10, monWeight:2,
+  rpm:15, fillScale:50, count:2000, period:'30d', profile:'custom',
+  pools:DEFAULT_POOLS, rows:[]
 };
 
 var CAT_INFO={
@@ -483,6 +557,8 @@ var CAT_KEYS=['human','ai-crawler','search-engine','spam','monitoring','unclassi
 // RENDER
 // ==============================
 function render(){
+  seedSource=seedSource?stateParams():null;
+  reseed();
   STATE.rows=generate(STATE);
   var s=summarize(STATE.rows);
   var imp=revenueImpact(s,STATE.rpm,STATE.fillScale);
@@ -552,6 +628,7 @@ bind('humanPct','humanPct','',function(v){return v+'%';});
 bind('aiWeight','aiWeight','');
 bind('spamWeight','spamWeight','');
 bind('searchWeight','searchWeight','');
+bind('monWeight','monWeight','');
 bind('rpm','rpm','$',function(v){return '$'+v;});
 bind('fillScale','fillScale','%',function(v){return v+'%';});
 bind('count','count','',function(v){return v.toLocaleString();});
@@ -566,6 +643,83 @@ document.querySelectorAll('.period-btn').forEach(function(btn){
 });
 
 document.getElementById('rerun').addEventListener('click',render);
+
+// Profile presets + shareable report links
+function setSlider(id,key,val,fmt){
+  var el=document.getElementById(id);
+  el.value=val;
+  STATE[key]=val;
+  document.getElementById(id+'-val').textContent=fmt?fmt(val):String(val);
+}
+function syncSliders(){
+  setSlider('humanPct','humanPct',STATE.humanPct,function(v){return v+'%';});
+  setSlider('aiWeight','aiWeight',STATE.aiWeight);
+  setSlider('spamWeight','spamWeight',STATE.spamWeight);
+  setSlider('searchWeight','searchWeight',STATE.searchWeight);
+  setSlider('monWeight','monWeight',STATE.monWeight);
+  setSlider('rpm','rpm',STATE.rpm,function(v){return '$'+v;});
+  setSlider('fillScale','fillScale',STATE.fillScale,function(v){return v+'%';});
+  setSlider('count','count',STATE.count,function(v){return v.toLocaleString();});
+  document.querySelectorAll('.period-btn').forEach(function(b){b.classList.toggle('active',b.dataset.p===STATE.period);});
+  var sel=document.getElementById('profile');
+  sel.value=STATE.profile;
+  document.getElementById('profileDesc').textContent=profileById(STATE.profile)
+    ?profileById(STATE.profile).desc
+    :'Every answer shows its assumption — transparency is the whole point.';
+}
+function profileById(id){for(var i=0;i<SAMPLE_PROFILES.length;i++)if(SAMPLE_PROFILES[i].id===id)return SAMPLE_PROFILES[i];return null;}
+function applyProfile(id){
+  var prof=profileById(id);
+  if(prof){
+    STATE.profile=id; STATE.humanPct=prof.humanPct; STATE.aiWeight=prof.aiWeight;
+    STATE.spamWeight=prof.spamWeight; STATE.searchWeight=prof.searchWeight;
+    STATE.monWeight=prof.monWeight; STATE.rpm=prof.rpm; STATE.fillScale=prof.fillScale;
+    STATE.count=prof.count;
+    STATE.pools={ai:prof.aiUAs,search:prof.searchUAs,spam:prof.spamUAs,mon:prof.monUAs};
+  } else {
+    STATE.profile='custom'; STATE.pools=DEFAULT_POOLS;
+  }
+  syncSliders();
+  render();
+}
+function stateParams(){
+  return 'v=1&p='+STATE.humanPct+'&a='+STATE.aiWeight+'&s='+STATE.spamWeight
+    +'&se='+STATE.searchWeight+'&m='+STATE.monWeight+'&r='+STATE.rpm
+    +'&f='+STATE.fillScale+'&c='+STATE.count+'&per='+STATE.period
+    +'&pr='+encodeURIComponent(STATE.profile);
+}
+function applyHash(){
+  var h=location.hash.replace(/^#/,'');
+  if(!h)return;
+  seedSource=h;
+  var q=new URLSearchParams(h);
+  function num(k,d){var v=q.get(k);return v===null?d:(Number(v)||d);}
+  STATE.humanPct=num('p',55); STATE.aiWeight=num('a',8); STATE.spamWeight=num('s',4);
+  STATE.searchWeight=num('se',10); STATE.monWeight=num('m',2);
+  STATE.rpm=num('r',15); STATE.fillScale=num('f',50); STATE.count=num('c',2000);
+  if(q.get('per'))STATE.period=q.get('per');
+  var pr=q.get('pr');
+  if(pr&&pr!=='custom')applyProfile(pr);
+  syncSliders();
+}
+function copyText(txt){
+  var done=function(){
+    document.getElementById('shareNote').textContent='Copied — anyone with this link sees the exact same report.';
+    setTimeout(function(){document.getElementById('shareNote').textContent='';},4000);
+  };
+  if(navigator.clipboard&&navigator.clipboard.writeText){
+    navigator.clipboard.writeText(txt).then(done).catch(done);
+  } else {
+    var ta=document.createElement('textarea');ta.value=txt;document.body.appendChild(ta);ta.select();
+    try{document.execCommand('copy');}catch(e){}
+    document.body.removeChild(ta);done();
+  }
+}
+document.getElementById('profile').addEventListener('change',function(){applyProfile(this.value);});
+document.getElementById('shareLink').addEventListener('click',function(){
+  seedSource=stateParams();
+  copyText(location.origin+location.pathname+'#'+stateParams());
+});
 
 // Custom UA classifier
 document.getElementById('classifyBtn').addEventListener('click',function(){
@@ -585,7 +739,8 @@ document.getElementById('customUA').addEventListener('keydown',function(e){
   if(e.key==='Enter')document.getElementById('classifyBtn').click();
 });
 
-// Initial render
+// Initial render (restores a shared report if the URL carries a #hash)
+applyHash();
 render();
 </script>
 </body>

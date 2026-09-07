@@ -44,7 +44,9 @@ their traffic. This design is deliberately boring and cheap:
 ## Data flow
 
 1. **Ingest** — the site sends a batch of request rows
-   (`{ userAgent, behaviourScore?, requestsPerMin?, dwellMs? }`).
+   (`{ userAgent, behaviourScore?, requestsPerMin?, dwellMs? }`), or an
+   operator pipes a real access log through the BYOD importer
+   (`examples/accesslog-to-ingest.js`).
 2. **Classify** — `src/engine/index.js` classifies each row into a category
    (`human`, `ai-crawler`, `search-engine`, `spam`, `monitoring`,
    `unclassified`) with a confidence and the signal that produced it.
@@ -53,6 +55,9 @@ their traffic. This design is deliberately boring and cheap:
    the in-memory `Map` for Postgres/Redis with the same shape.
 4. **Aggregate** — `aggregate(namespace, rpm, fillScale)` rolls counts up into
    a period summary and a revenue-impact estimate.
+5. **Lookup** — `GET /api/v1/classify?ua=...` exposes the engine's verdict
+   (category, confidence, signal) for any single user-agent — useful to audit
+   a UA you just saw in your logs.
 
 ## The revenue math (honest by construction)
 
@@ -73,6 +78,29 @@ The incumbents sell *opacity*: the less a customer can verify, the more a
 subscription is worth. BotTollbooth inverts that. Because the core is open
 and self-hostable, any owner — or their agency — can see exactly how a number
 was produced. That position is the product: **transparency as the moat**.
+
+## Bring your own data
+
+The service only becomes useful once it sees *your* traffic. The demo ships
+real-world profiles built from 2026 industry data (`data/samples/profiles.js`)
+and a deterministic share-link feature, but real numbers come from real logs:
+
+```bash
+node examples/accesslog-to-ingest.js access.log --post http://localhost:8080 --namespace mysite.com
+```
+
+The importer (`examples/accesslog-to-ingest.js`) is a zero-dependency CLI
+that:
+
+- parses Nginx/Apache **combined-format** access logs (referer + user-agent);
+- computes each client IP's burst rate as the **densest 60-second window**,
+  so residential-proxy scrapers that blast a few pages in seconds classify as
+  bots instead of hiding behind a human UA;
+- POSTs batches to `/api/v1/ingest` (or prints JSON rows for piping), with
+  `--namespace`, `--limit`, and `stdin` support.
+
+Feed the output of any log pipeline you already run (Nginx, Cloudflare
+logs, ELK) straight into the same endpoint.
 
 ## The container
 
@@ -105,7 +133,8 @@ behind the same interface (`src/service/ingest.js`) with no API change.
 ## Todo / roadmap (real integrations)
 
 - Postgres/Redis store behind the same `buckets` interface.
-- Adapter for common inputs: Google Analytics 4 export, Cloudflare logs, raw
-  Nginx/Apache access logs, a drop-in JS snippet.
+- Adapter for common inputs: Google Analytics 4 export and Cloudflare logs
+  (Nginx/Apache access logs are already supported via
+  `examples/accesslog-to-ingest.js`), plus a drop-in JS snippet.
 - Scheduled period rollups and a simple alerting hook ("bot rate > 40%").
 - Multi-namespace admin webbook for agencies managing many client sites.

@@ -17,11 +17,18 @@ jobs:
         run: npm test
       - name: Run demo
         run: node examples/demo.js --rpm 15
+      - name: Run BYOD access-log importer on the fixture
+        run: |
+          node examples/accesslog-to-ingest.js examples/fixtures/access.log --limit 4 >/dev/null
+          cat examples/fixtures/access.log | node examples/accesslog-to-ingest.js --limit 4 >/dev/null
       - name: Boot analytics service and hit the API
         run: |
           node src/service/server.js & API_PID=$!
           sleep 2
           curl -fsS http://localhost:8080/health
+          curl -fsS "http://localhost:8080/api/v1/classify?ua=Bytespider" | grep -q '"category":"ai-crawler"'
+          node examples/accesslog-to-ingest.js examples/fixtures/access.log --post http://localhost:8080 --namespace shop.example.com
+          curl -fsS "http://localhost:8080/api/v1/report?namespace=shop.example.com&rpm=15" | grep -q '"ai-crawler":'
           kill $API_PID
       - name: Build container image
         run: docker build -t bottollbooth:ci .

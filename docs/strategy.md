@@ -268,7 +268,8 @@ that reinforces transparency instead of replacing substance with rails.
 
 ## 6. What we build next (roadmap tie-in)
 
-- **L1 — Know your traffic (this repo).** Engine + service + demo. Done.
+- **L1 — Know your traffic (this repo).** Engine + service + demo +
+  BYOD access-log ingest. Done.
 - **L2 — Value-exchange products.** Crawl-to-referral framing, purpose
   breakdowns, per-client reports for agencies, signed report digests.
   (North Stars 1, 4 — Tier 1 web3.)

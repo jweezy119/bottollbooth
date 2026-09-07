@@ -22,6 +22,7 @@
 
 const http = require('node:http');
 const { ingest, aggregate } = require('./ingest.js');
+const { classify, CATEGORIES } = require('../engine/index.js');
 
 const PORT = Number(process.env.PORT) || 8080;
 const DEFAULT_RPM = Number(process.env.DEFAULT_RPM) || 15;
@@ -80,6 +81,14 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, report);
     }
 
+    // GET /api/v1/classify?ua=...
+    if (req.method === 'GET' && url.pathname === '/api/v1/classify') {
+      const ua = url.searchParams.get('ua') || '';
+      if (!ua) return send(res, 400, { error: 'missing ?ua=' });
+      const verdict = classify({ userAgent: ua });
+      return send(res, 200, { userAgent: ua, ...verdict });
+    }
+
     // GET /health
     if (req.method === 'GET' && url.pathname === '/health') {
       return send(res, 200, { status: 'ok' });
@@ -93,8 +102,9 @@ const server = http.createServer(async (req, res) => {
 
 server.listen(PORT, () => {
   console.log(`BotTollbooth analytics service listening on :${PORT}`);
-  console.log(`  POST /api/v1/ingest` );
+  console.log(`  POST /api/v1/ingest`);
   console.log(`  GET  /api/v1/report?namespace=<site>&rpm=15`);
+  console.log(`  GET  /api/v1/classify?ua=<user-agent>`);
   console.log(`  GET  /health`);
 });
 

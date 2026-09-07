@@ -64,13 +64,17 @@ that should be simple, transparent facts.
 ```bash
 node test/engine.test.js             # smoke-test the classifier
 node examples/demo.js --rpm 15        # CLI demo of the revenue impact
+node examples/accesslog-to-ingest.js  # BYOD: parse a real access log
 ```
 
 ### Try the live dashboard
 
-Open the [interactive demo](https://jweezy119.github.io/bottollbooth/): adjust
-your traffic mix, RPM, and fill assumptions, and see the whole picture update
-in real time. It runs entirely in your browser.
+Open the [interactive demo](https://jweezy119.github.io/bottollbooth/): tune
+the mix — or start from a real-world profile (Local Business, E-commerce,
+Editorial) built on 2026 crawler data — adjust RPM and fill assumptions, and
+see the whole picture update in real time. It runs entirely in your browser.
+Use **Copy Report Link** to share an exact report: the link reproduces the
+identical dataset on any device.
 
 ### Deploy the service
 
@@ -92,6 +96,25 @@ host side: `docker run -p 8081:8080 bottollbooth`.
 **Or run directly** — point any Node.js (>=18) host at this repo;
 `src/service/` is the analytics ingestion + aggregation service that site
 owners wire up (`PORT=8080 npm start`).
+
+### Score your own traffic (bring your own data)
+
+Feed the service **real traffic**, not a simulation:
+
+```bash
+node examples/accesslog-to-ingest.js access.log --post http://localhost:8080 --namespace mysite.com
+curl "http://localhost:8080/api/v1/report?namespace=mysite.com&rpm=15"
+```
+
+The importer parses Nginx/Apache combined-format access logs, computes each
+client's burst rate (the densest 60-second window per IP), and POSTs batches
+to `/api/v1/ingest`. No npm install, no config. There is also a live lookup
+endpoint for any user-agent:
+
+```bash
+curl "http://localhost:8080/api/v1/classify?ua=Bytespider"
+# {"userAgent":"Bytespider","category":"ai-crawler","confidence":0.92,"signal":"ua:ai-crawler"}
+```
 
 ---
 
@@ -126,9 +149,12 @@ assumptions matters more than a big number.
 Dockerfile                  Container image for the analytics service
 docker-compose.yml          One-command hosting setup for any box with Docker
 index.html                  The interactive dashboard demo (browser only)
+data/samples/profiles.js    Real-world traffic profiles (2026 crawler data)
 src/engine/                 Pure classification + revenue-impact engine
-src/service/                The installable analytics service (ingest + aggregate)
+src/service/                The installable analytics service (ingest + aggregate + classify)
 examples/demo.js            Standalone CLI demo of the engine
+examples/accesslog-to-ingest.js  BYOD: turn a real access log into /api/v1/ingest rows
+examples/fixtures/access.log     Sample combined-format log (tests + CI)
 test/                       Smoke tests (zero-dependency)
 docs/architecture.md        How the product is built and deployed
 docs/monetization.md        The honest, fair-pricing business model
