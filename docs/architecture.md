@@ -6,6 +6,9 @@ their traffic. This design is deliberately boring and cheap:
 
 - **Zero server-side dependencies** — only Node.js built-ins. Deployable to a
   $5 VPS, Cloud Run, Lambda, Fly.io, or on-prem with no lock-in.
+- **Container-first** — ships a ready Docker image (Node 22 Alpine, non-root
+  user, healthcheck) so any owner or agency self-hosts it in one command on
+  any box, with no framework and no lock-in.
 - **Privacy-preserving by default** — only classification *counts by
   category* are retained, never raw user agents, never PII, no cookies, no
   fingerprint storage.
@@ -71,12 +74,31 @@ subscription is worth. BotTollbooth inverts that. Because the core is open
 and self-hostable, any owner — or their agency — can see exactly how a number
 was produced. That position is the product: **transparency as the moat**.
 
+## The container
+
+`Dockerfile` builds on `node:22-alpine` — **no build step and no `npm
+install`**, because the service genuinely has zero dependencies. The image
+contains only `src/` and `package.json`, runs as the unprivileged `node`
+user (never root), listens on `PORT` (default `8080`), and ships a
+`/health` healthcheck so orchestrators and compose can detect a dead
+container. `docker-compose.yml` wraps it for one-command hosting:
+
+```bash
+docker compose up -d     # builds, maps 8080:8080, restarts on failure
+```
+
+**Persistence note:** the store is an in-memory `Map`, so a container
+restart resets the aggregates — deliberate (privacy) and fine for a demo or
+per-batch analytics. A production build swaps `buckets` for Postgres/Redis
+behind the same interface (`src/service/ingest.js`) with no API change.
+
 ## Deployment options
 
 | Target | How |
 | --- | --- |
+| Any box with Docker | `docker compose up -d` (port `8080`, env `PORT`) |
 | Local / dev | `npm start` |
-| Cloud Run / Fly.io / VPS | run `src/service/server.js` with `PORT` env; add a reverse proxy |
+| Cloud Run / Fly.io / VPS | run the image or `src/service/server.js` with `PORT` env; add a reverse proxy |
 | Function (Lambda / Workers) | wrap `ingest()` / `aggregate()` in the framework handler of your choice |
 | Edge / CDN | the same endpoint handed off to Cloudflare Workers or a CDN worker |
 

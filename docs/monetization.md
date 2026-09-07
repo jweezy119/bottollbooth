@@ -42,6 +42,9 @@ proves we're not hiding anything. Anyone can verify every number.
 For owners who don't want to run infrastructure. Set up, host, and maintain
 the pipeline for a **small, flat monthly fee** — a fraction of enterprise
 pricing, tiered by traffic volume, with a **free tier** for small sites.
+The repo ships a ready container image, so one modest VPS can host many
+tenant sites cheaply: our infrastructure cost stays near zero, which is
+exactly why the managed tier's price can stay honest.
 
 ### 3. Agency layer
 Many marketing agencies already manage dozens of client sites. A multi-tenant

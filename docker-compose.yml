@@ -1,0 +1,10 @@
+services:
+  bottollbooth:
+    build: .
+    image: bottollbooth:latest
+    container_name: bottollbooth
+    environment:
+      PORT: 8080
+    ports:
+      - "8080:8080"
+    restart: unless-stopped

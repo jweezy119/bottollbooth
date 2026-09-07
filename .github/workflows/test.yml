@@ -23,3 +23,11 @@ jobs:
           sleep 2
           curl -fsS http://localhost:8080/health
           kill $API_PID
+      - name: Build container image
+        run: docker build -t bottollbooth:ci .
+      - name: Smoke-test the container
+        run: |
+          docker run -d --rm --name bottollbooth-ci -p 8123:8080 bottollbooth:ci
+          sleep 3
+          curl -fsS http://localhost:8123/health
+          docker stop bottollbooth-ci

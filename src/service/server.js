@@ -98,4 +98,13 @@ server.listen(PORT, () => {
   console.log(`  GET  /health`);
 });
 
+function shutdown(signal) {
+  console.log(`${signal} received — shutting down`);
+  server.close(() => process.exit(0));
+  setTimeout(() => process.exit(0), 3000).unref();
+}
+
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT', () => shutdown('SIGINT'));
+
 module.exports = server;

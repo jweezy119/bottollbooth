@@ -74,8 +74,24 @@ in real time. It runs entirely in your browser.
 
 ### Deploy the service
 
-Point a Node.js (>=18) host at this repo; `src/service/` contains the
-analytics ingestion + aggregation service that site owners wire up.
+**Easiest: run the container** (Node 22 Alpine, non-root, healthcheck built in):
+
+```bash
+docker build -t bottollbooth .
+docker run -d --name bottollbooth -p 8080:8080 bottollbooth
+# or, one command with the bundled compose file:
+docker compose up -d
+
+curl http://localhost:8080/health     # {"status":"ok"}
+```
+
+The container is just the zero-dependency analytics service; the dashboard
+stays a browser file (`index.html`). If port 8080 is taken, change only the
+host side: `docker run -p 8081:8080 bottollbooth`.
+
+**Or run directly** — point any Node.js (>=18) host at this repo;
+`src/service/` is the analytics ingestion + aggregation service that site
+owners wire up (`PORT=8080 npm start`).
 
 ---
 
@@ -107,6 +123,8 @@ assumptions matters more than a big number.
 ## Repo layout
 
 ```
+Dockerfile                  Container image for the analytics service
+docker-compose.yml          One-command hosting setup for any box with Docker
 index.html                  The interactive dashboard demo (browser only)
 src/engine/                 Pure classification + revenue-impact engine
 src/service/                The installable analytics service (ingest + aggregate)
