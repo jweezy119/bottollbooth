@@ -21,8 +21,14 @@
  */
 
 const fs = require('node:fs');
+const path = require('node:path');
 const { rowsFromLog, parseAccessLine } = require('./accesslog-to-ingest.js');
-const { ingest, aggregate } = require('../src/service/ingest.js');
+const {
+  ingest,
+  aggregate,
+  reportDigest,
+} = require('../src/service/ingest.js');
+const { robotTxt, optOutList, ntmDisclosure } = require('../src/engine/index.js');
 
 function parseArgs() {
   const args = process.argv.slice(2);
@@ -30,7 +36,7 @@ function parseArgs() {
     const i = args.indexOf(k);
     return i >= 0 ? args[i + 1] : undefined;
   };
-  const VALUED = new Set(['--namespace', '--rpm', '--fill-scale']);
+  const VALUED = new Set(['--namespace', '--rpm', '--fill-scale', '--write-dir']);
   const positional = [];
   for (let i = 0; i < args.length; i++) {
     const a = args[i];
@@ -45,6 +51,7 @@ function parseArgs() {
     namespace: opt('--namespace') || 'site',
     rpm: Number(opt('--rpm') || 15),
     fillScale: Number(opt('--fill-scale') || 50),
+    writeDir: opt('--write-dir'),
   };
 }
 
@@ -103,18 +110,48 @@ function buildReport(file, { namespace = 'site', rpm = 15, fillScale = 50 } = {}
   lines.push(`  bots, last window:     ${report.impact.botVisitors}`);
   lines.push(`  monthly recovered @rpm ${rpm} (fill ${fillScale}%): $${report.impact.recoveredMonthly.toFixed(3)}`);
   lines.push('');
+  lines.push('4. Compliance (CoMP / EU AI-act opt-outs)');
+  lines.push('----------------------------------------');
+  for (const entry of optOutList(report.crawlers)) {
+    lines.push(`  ${(entry.key + ':').padEnd(20)} ${entry.verdict.padEnd(8)} ${String(entry.requests).padStart(4)} req  ${entry.reason}`);
+  }
+  lines.push(`  robots.txt: ${robotTxt(report.crawlers, { namespace }).split('\n').length - 1} lines generated (${optOutList(report.crawlers).filter((e) => e.verdict === 'opt-out').length} opt-outs)`);
+  const disclosure = ntmDisclosure(report.crawlers, {
+    namespace,
+    start: report.window.start,
+    end: report.window.end,
+    reportDigest: report.digest,
+  });
+  disclosure.json.digest = reportDigest(disclosure.json);
+  lines.push(`  disclosure digest: sha256 ${disclosure.json.digest}`);
+  lines.push('');
   lines.push(`digest: sha256 ${report.digest}`);
-  return { text: lines.join('\n'), report };
+  return { text: lines.join('\n'), report, compliance: { robotsTxt: robotTxt(report.crawlers, { namespace }), optOuts: optOutList(report.crawlers), disclosure } };
+}
+
+function writeArtifacts(dir, compliance, namespace) {
+  fs.mkdirSync(dir, { recursive: true });
+  const files = {
+    'robots.txt': compliance.robotsTxt,
+    'opt-outs.json': JSON.stringify(compliance.optOuts, null, 2),
+    'disclosure.json': JSON.stringify(compliance.disclosure.json, null, 2),
+    'disclosure.txt': compliance.disclosure.text,
+  };
+  for (const [name, body] of Object.entries(files)) {
+    fs.writeFileSync(path.join(dir, name), body);
+    console.log(`wrote ${path.join(dir, name)}`);
+  }
 }
 
 if (require.main === module) {
-  const { file, namespace, rpm, fillScale } = parseArgs();
+  const { file, namespace, rpm, fillScale, writeDir } = parseArgs();
   if (!file) {
-    console.error('usage: node examples/site-report.js access.log [--namespace ns] [--rpm 15] [--fill-scale 50]');
+    console.error('usage: node examples/site-report.js access.log [--namespace ns] [--rpm 15] [--fill-scale 50] [--write-dir out]');
     process.exit(1);
   }
-  const { text } = buildReport(file, { namespace, rpm, fillScale });
+  const { text, compliance } = buildReport(file, { namespace, rpm, fillScale });
   console.log(text);
+  if (writeDir) writeArtifacts(writeDir, compliance, namespace);
 }
 
 module.exports = { buildReport, PURPOSE_COPY };

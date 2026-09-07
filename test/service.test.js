@@ -7,6 +7,7 @@
 
 const assert = require('node:assert');
 const { ingest, aggregate, reportDigest } = require('../src/service/ingest.js');
+const { robotTxt, optOutList, ntmDisclosure } = require('../src/engine/index.js');
 
 const NS = 'store.example.com';
 
@@ -43,6 +44,17 @@ assert.ok(/^[0-9a-f]{64}$/.test(report.digest));
 assert.strictEqual(reportDigest({ summary: report.summary, impact: report.impact, extra: 1 }),
   reportDigest({ extra: 1, impact: report.impact, summary: report.summary }));
 assert.notStrictEqual(report.digest, reportDigest({ ...report, generatedAt: 'tampered' }));
+
+// per-crawler counts feed the compliance/opt-out layer
+assert.strictEqual(report.crawlers.GPTBot.requests, 1);
+assert.strictEqual(report.crawlers.GPTBot.purpose, 'training');
+assert.strictEqual(report.crawlers.Googlebot.purpose, 'search');
+assert.ok(/^\d{4}-\d{2}-\d{2}T/.test(report.window.start));
+const complianceRt = robotTxt(report.crawlers, { namespace: NS });
+assert.ok(complianceRt.includes('User-agent: GPTBot'));
+assert.ok(!complianceRt.includes('bingbot'));
+const disc = ntmDisclosure(report.crawlers, { namespace: NS, reportDigest: report.digest });
+assert.ok(disc.text.includes(report.digest), 'disclosure chains the report digest');
 
 let threw = false;
 try { ingest('', []); } catch { threw = true; }

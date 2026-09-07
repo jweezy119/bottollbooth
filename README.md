@@ -66,6 +66,7 @@ node test/engine.test.js             # smoke-test the classifier
 node examples/demo.js --rpm 15        # CLI demo of the revenue impact
 node examples/accesslog-to-ingest.js  # BYOD: parse a real access log
 node examples/site-report.js access.log  # full purpose + value-exchange report
+node examples/site-report.js access.log --write-dir out/  # + robots.txt + CoMP/NTM disclosure
 ```
 
 ### Try the live dashboard
@@ -105,12 +106,16 @@ Feed the service **real traffic**, not a simulation:
 ```bash
 node examples/accesslog-to-ingest.js access.log --post http://localhost:8080 --namespace mysite.com
 curl "http://localhost:8080/api/v1/report?namespace=mysite.com&rpm=15"
+curl "http://localhost:8080/api/v1/compliance?namespace=mysite.com"
+# {"namespace":... ,"robotsTxt":"...","optOuts":[...],"disclosure":{...}}
 ```
 
 The importer parses Nginx/Apache combined-format access logs, computes each
 client's burst rate (the densest 60-second window per IP), and POSTs batches
-to `/api/v1/ingest`. No npm install, no config. There is also a live lookup
-endpoint for any user-agent:
+to `/api/v1/ingest`. No npm install, no config. The compliance endpoint turns
+the observed crawlers straight into a CoMP / EU AI-act opt-out policy and
+disclosure (live demo: **CoMP / EU Opt-out & Disclosure** panel). There is
+also a live lookup endpoint for any user-agent:
 
 ```bash
 curl "http://localhost:8080/api/v1/classify?ua=Bytespider"

@@ -278,6 +278,10 @@ that reinforces transparency instead of replacing substance with rails.
 - **L3 — Trust layer.** Crawler/agent registry with credentialed identities
   + CoMP/EU-compliance reporter + anchored audit logs.
   (North Stars 2, 3 — Tier 1/2 web3.)
+  HTML-started: `recommendCrawler()`, `robotTxt()`, `optOutList()`,
+  `ntmDisclosure()` in the engine, `/api/v1/compliance` in the service,
+  `--write-dir` on `site-report.js`, and a "CoMP / EU Opt-out & Disclosure"
+  demo panel. Remaining: credentialed registry (NS 2), anchored audit logs.
 
 Each layer is shipped open and self-hostable, grows the portfolio with
 verifiable artifacts, and never requires asking for permission or capital.

@@ -21,8 +21,14 @@
  */
 
 const http = require('node:http');
-const { ingest, aggregate } = require('./ingest.js');
-const { classify, CATEGORIES } = require('../engine/index.js');
+const { ingest, aggregate, reportDigest } = require('./ingest.js');
+const {
+  classify,
+  CATEGORIES,
+  robotTxt,
+  optOutList,
+  ntmDisclosure,
+} = require('../engine/index.js');
 
 const PORT = Number(process.env.PORT) || 8080;
 const DEFAULT_RPM = Number(process.env.DEFAULT_RPM) || 15;
@@ -81,6 +87,27 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, report);
     }
 
+    // GET /api/v1/compliance?namespace=x
+    if (req.method === 'GET' && url.pathname === '/api/v1/compliance') {
+      const namespace = url.searchParams.get('namespace');
+      if (!namespace) return send(res, 400, { error: 'missing ?namespace=' });
+      const report = aggregate(namespace, DEFAULT_RPM, 50);
+      const disclosure = ntmDisclosure(report.crawlers, {
+        namespace,
+        start: report.window.start,
+        end: report.window.end,
+        reportDigest: report.digest,
+      });
+      disclosure.json.digest = reportDigest(disclosure.json);
+      return send(res, 200, {
+        namespace,
+        robotsTxt: robotTxt(report.crawlers, { namespace }),
+        optOuts: optOutList(report.crawlers),
+        disclosure,
+        generatedAt: report.generatedAt,
+      });
+    }
+
     // GET /api/v1/classify?ua=...
     if (req.method === 'GET' && url.pathname === '/api/v1/classify') {
       const ua = url.searchParams.get('ua') || '';
@@ -104,6 +131,7 @@ server.listen(PORT, () => {
   console.log(`BotTollbooth analytics service listening on :${PORT}`);
   console.log(`  POST /api/v1/ingest`);
   console.log(`  GET  /api/v1/report?namespace=<site>&rpm=15`);
+  console.log(`  GET  /api/v1/compliance?namespace=<site>`);
   console.log(`  GET  /api/v1/classify?ua=<user-agent>`);
   console.log(`  GET  /health`);
 });

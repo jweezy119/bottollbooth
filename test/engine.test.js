@@ -13,6 +13,10 @@ const {
   summarize,
   valueExchange,
   revenueImpact,
+  recommendCrawler,
+  robotTxt,
+  optOutList,
+  ntmDisclosure,
   CATEGORIES,
 } = require('../src/engine/index.js');
 
@@ -77,5 +81,34 @@ const impact = revenueImpact(summary, 15);
 assert.strictEqual(impact.botVisitors, 3);
 // 3 bots / 1000 * 15 rpm * 0.5 fill scale = 0.0225
 assert.ok(Math.abs(impact.recoveredMonthly - 0.0225) < 1e-9);
+
+// Compliance decision core
+assert.strictEqual(recommendCrawler({ key: 'GPTBot', purpose: 'training' }).verdict, 'opt-out');
+assert.strictEqual(recommendCrawler({ key: 'Googlebot', purpose: 'search' }).verdict, 'allow');
+assert.strictEqual(recommendCrawler({ key: 'Amazonbot', purpose: 'mixed' }).verdict, 'review');
+assert.strictEqual(recommendCrawler(null).verdict, 'review');
+
+const crawlers = {
+  GPTBot: { label: 'GPTBot (OpenAI)', purpose: 'training', ppr: 1091, requests: 3 },
+  bingbot: { label: 'bingbot (search)', purpose: 'search', ppr: 10, requests: 2 },
+};
+const rt = robotTxt(crawlers, { namespace: 'shop.example.com' });
+assert.ok(rt.includes('User-agent: GPTBot'), 'robots.txt opts out training crawlers');
+assert.ok(rt.includes('Disallow: /'));
+assert.ok(!rt.includes('User-agent: bingbot'), 'robots.txt must not block search');
+assert.ok(rt.includes('shop.example.com'));
+
+const outs = optOutList(crawlers);
+assert.strictEqual(outs.length, 2);
+assert.strictEqual(outs[0].key, 'GPTBot'); // CRAWLERS-order deterministic
+assert.strictEqual(outs[0].verdict, 'opt-out');
+assert.strictEqual(outs[1].verdict, 'allow');
+
+const disc = ntmDisclosure(crawlers, { namespace: 'shop.example.com' });
+assert.ok(disc.text.includes('NTM / AI-training disclosure'));
+assert.ok(disc.text.includes('GPTBot'));
+assert.strictEqual(disc.json.namespace, 'shop.example.com');
+assert.strictEqual(disc.json.crawlers[0].verdict, 'opt-out');
+assert.ok(disc.json.basis.length > 20);
 
 console.log('engine.test.js: all assertions passed.');

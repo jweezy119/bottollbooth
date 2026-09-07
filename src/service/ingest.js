@@ -40,9 +40,11 @@ function ingest(namespace, rows) {
     entries.push({
       category,
       confidence,
+      key: meta ? meta.key : null,
+      label: meta ? meta.label : null,
       purpose: meta ? meta.purpose : null,
       ppr: meta && typeof meta.ppr === 'number' ? meta.ppr : null,
-      at: Date.now(),
+      at: typeof row.at === 'number' ? row.at : Date.now(),
     });
     accepted += 1;
   }
@@ -77,7 +79,33 @@ function reportDigest(report) {
 function aggregate(namespace, rpm, fillScale = 50) {
   const entries = buckets.get(namespace) || [];
   const byCategory = {};
-  for (const e of entries) byCategory[e.category] = (byCategory[e.category] || 0) + 1;
+  const crawlers = {};
+  let first = null;
+  let last = null;
+  for (const e of entries) {
+    byCategory[e.category] = (byCategory[e.category] || 0) + 1;
+    if (e.key) {
+      const slot = crawlers[e.key] || (crawlers[e.key] = {
+        label: e.label,
+        purpose: e.purpose,
+        ppr: e.ppr,
+        requests: 0,
+        category: e.category,
+      });
+      slot.requests += 1;
+    } else if (e.category === 'ai-crawler') {
+      const slot = (crawlers['unknown-ai'] || (crawlers['unknown-ai'] = {
+        label: 'Unknown AI crawler (not in registry)',
+        purpose: null,
+        ppr: null,
+        requests: 0,
+        category: 'ai-crawler',
+      }));
+      slot.requests += 1;
+    }
+    if (first === null || e.at < first) first = e.at;
+    if (last === null || e.at > last) last = e.at;
+  }
   const total = entries.length;
   const human = byCategory.human || 0;
   const bot = total - human;
@@ -90,6 +118,11 @@ function aggregate(namespace, rpm, fillScale = 50) {
   };
   const report = {
     summary,
+    crawlers,
+    window: {
+      start: first ? new Date(first).toISOString() : null,
+      end: last ? new Date(last).toISOString() : null,
+    },
     impact: revenueImpact(summary, rpm, { botFillScale: fillScale / 100 }),
     valueExchange: valueExchange(entries),
     generatedAt: new Date().toISOString(),

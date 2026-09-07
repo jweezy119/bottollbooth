@@ -92,4 +92,15 @@ assert.strictEqual(sandbox.crawlIntent('Totally unknown UA/99'), null);
 assert.ok(typeof ve.estimatedReferralsReturned === 'number');
 assert.ok(ve.pagesPerReferral === null || ve.pagesPerReferral > 0);
 
+// compliance / opt-out layer
+const cc = sandbox.crawlerCounts(rows);
+assert.ok(cc.GPTBot && cc.GPTBot.requests > 0, 'crawler counts include GPTBot');
+assert.strictEqual(sandbox.recommendCrawler({ key: 'GPTBot', purpose: 'training' }).verdict, 'opt-out');
+assert.strictEqual(sandbox.recommendCrawler({ key: 'Googlebot', purpose: 'search' }).verdict, 'allow');
+const demoRt = sandbox.robotTxt(cc);
+assert.ok(demoRt.includes('User-agent: GPTBot'));
+assert.ok(!demoRt.includes('User-agent: Googlebot'));
+assert.ok(sandbox.ntmDisclosure(cc).includes('NTM / EU AI-act disclosure') || sandbox.ntmDisclosure(cc).includes('CoMP'));
+assert.ok(sandbox.optOutList(cc).length > 0);
+
 console.log('demo.test.js: all assertions passed.');

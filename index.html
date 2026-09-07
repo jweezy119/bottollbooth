@@ -218,6 +218,14 @@
   .ve-summary { display: flex; gap: 18px; margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--border-light); color: var(--muted); font-size: 0.82em; flex-wrap: wrap; }
   .ve-summary span { display: inline-flex; align-items: center; gap: 6px; }
   .ve-summary strong { color: var(--text); font-weight: 500; }
+
+  .comp-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 12px; }
+  @media (max-width: 768px) { .comp-cols { grid-template-columns: 1fr; } }
+  .comp-col { border: 1px solid var(--border-light); border-radius: 8px; overflow: hidden; }
+  .comp-hdr { display: flex; justify-content: space-between; align-items: center; padding: 8px 10px; background: rgba(255,255,255,0.03); border-bottom: 1px solid var(--border-light); font-size: 0.8em; color: var(--muted); }
+  .comp-hdr span { font-weight: 500; color: var(--text); }
+  .comp-pre { margin: 0; padding: 10px; font-size: 0.72em; line-height: 1.45; white-space: pre-wrap; word-break: break-word; color: var(--muted); max-height: 220px; overflow: auto; }
+  td .pill.dot { font-size: 0.75em; margin-right: 2px; }
 </style>
 </head>
 <body>
@@ -366,6 +374,26 @@
   <div class="ve-summary" id="ve-summary"></div>
 </div>
 
+<!-- COMPLIANCE -->
+<div class="panel">
+  <div class="panel-title">🛡️ CoMP / EU Opt-out &amp; Disclosure</div>
+  <div class="panel-desc">Below the answers, the actions: which observed AI crawlers to <strong>opt out</strong> (training), which to <strong>allow</strong> (search), plus a generated <code>robots.txt</code> and a CoMP / EU AI-act disclosure you can publish as-is.</div>
+  <table class="cat-table">
+    <thead><tr><th>Crawler</th><th>Requests</th><th>Verdict</th><th>Why</th></tr></thead>
+    <tbody id="comp-tbody"></tbody>
+  </table>
+  <div class="comp-cols">
+    <div class="comp-col">
+      <div class="comp-hdr"><span>robots.txt</span><button class="btn-small" id="copyRobots">Copy</button></div>
+      <pre class="comp-pre" id="comp-robots"></pre>
+    </div>
+    <div class="comp-col">
+      <div class="comp-hdr"><span>Disclosure (CoMP / EU AI-act)</span><button class="btn-small" id="copyDisp">Copy</button></div>
+      <pre class="comp-pre" id="comp-disp"></pre>
+    </div>
+  </div>
+</div>
+
 <!-- CLASSIFY YOUR OWN -->
 <div class="panel">
   <div class="panel-title">🔍 Classify Any User-Agent</div>
@@ -476,7 +504,7 @@ var CRAWLERS=[
 function crawlIntent(ua){
   if(!ua)return null;
   for(var i=0;i<CRAWLERS.length;i++){
-    if(CRAWLERS[i].re.test(ua))return{label:CRAWLERS[i].label,purpose:CRAWLERS[i].purpose,ppr:CRAWLERS[i].ppr};
+    if(CRAWLERS[i].re.test(ua))return{key:CRAWLERS[i].key,label:CRAWLERS[i].label,purpose:CRAWLERS[i].purpose,ppr:CRAWLERS[i].ppr};
   }
   return null;
 }
@@ -493,6 +521,60 @@ function valueExchange(rows){
     if(typeof c.ppr==='number'&&c.ppr>0){returned+=1/c.ppr;byReturn[c.purpose]+=1/c.ppr;}
   }
   return{automatedRequests:automated,byPurpose:byPurpose,byReturn:byReturn,estimatedReferralsReturned:returned,pagesPerReferral:automated>0&&returned>0?automated/returned:null};
+}
+
+function recommendCrawler(meta){
+  if(!meta||!meta.purpose)return{verdict:'review',reason:'Unidentified automated system — confirm the user-agent in access logs',mechanism:'manual'};
+  if(meta.purpose==='training')return{verdict:'opt-out',reason:'AI training crawler: copies content, returns no visitors',mechanism:'robots.txt'};
+  if(meta.purpose==='search')return{verdict:'allow',reason:'Search crawler: indexes content and sends real visitors back',mechanism:'none'};
+  return{verdict:'review',reason:'On-demand/mixed crawler: decide whether AI tools may read on request',mechanism:'robots.txt'};
+}
+function crawlerCounts(rows){
+  var crawlers={},i,c;
+  for(i=0;i<rows.length;i++){
+    c=crawlIntent(rows[i].userAgent);
+    if(!c){ if(classify(rows[i]).category==='ai-crawler'){var u=crawlers['unknown-ai']||(crawlers['unknown-ai']={label:'Unknown AI crawler',purpose:null,requests:0});u.requests++;} continue; }
+    var slot=crawlers[c.key]||(crawlers[c.key]={label:c.label,purpose:c.purpose,requests:0});
+    slot.requests++;
+  }
+  return crawlers;
+}
+function optOutList(crawlers){
+  var list=[],i,key;
+  for(i=0;i<CRAWLERS.length;i++){
+    key=CRAWLERS[i].key;
+    if(crawlers[key]){
+      var c=crawlers[key],rec=recommendCrawler(c);
+      list.push({key:key,label:c.label,purpose:c.purpose||'unknown',requests:c.requests,verdict:rec.verdict,reason:rec.reason});
+    }
+  }
+  return list;
+}
+function robotTxt(crawlers){
+  var out=['# bot-tollbooth — generated robots.txt','# Opt-out for the AI training crawlers observed in this traffic.','# Search crawlers are not blocked.'];
+  var any=false,i,key;
+  for(i=0;i<CRAWLERS.length;i++){
+    key=CRAWLERS[i].key;
+    if(crawlers[key]&&recommendCrawler(crawlers[key]).verdict==='opt-out'){
+      any=true;out.push('','User-agent: '+key,'Disallow: /');
+    }
+  }
+  if(!any)out.push('','# No known AI training crawlers observed — nothing to block.');
+  return out.join('\n');
+}
+function ntmDisclosure(crawlers){
+  var out=['CoMP / EU AI-act disclosure for this site',''];
+  var list=optOutList(crawlers),i,e;
+  for(i=0;i<list.length;i++){
+    e=list[i];
+    out.push(' - '+e.label+' ('+e.key+') — '+e.requests+' req — '+e.purpose+' — '+e.verdict);
+  }
+  out.push('');
+  out.push('Basis: training crawlers are opted out via robots.txt; search indexing is');
+  out.push('permitted and returns visitors; on-demand/mixed crawls remain at the site');
+  out.push("owner's discretion. Purpose labels are vendor-declared — verify against");
+  out.push('vendor documentation.');
+  return out.join('\n');
 }
 
 // ==============================
@@ -680,6 +762,22 @@ function render(){
     : '<span>No known-crawl traffic in this sample.</span>';
   document.getElementById('ve-summary').innerHTML=veStats;
 
+  // Compliance
+  var cc=crawlerCounts(STATE.rows);
+  var compl=optOutList(cc);
+  var pillFor={'opt-out':'ai-crawler',allow:'search-engine',review:'monitoring'};
+  var compHtml='';
+  for(var ci=0;ci<compl.length;ci++){
+    var e=compl[ci];
+    compHtml+='<tr><td><span class="pill '+pillFor[e.verdict]+'">'+e.key+'</span></td><td>'+e.requests+'</td><td>'+e.verdict+'</td><td style="color:var(--subtle);font-size:0.82em">'+e.reason+'</td></tr>';
+  }
+  if(!compHtml)compHtml='<tr><td colspan="4" style="color:var(--subtle)">No known crawlers in this sample — nothing to opt out of.</td></tr>';
+  document.getElementById('comp-tbody').innerHTML=compHtml;
+  STATE.robotsTxt=robotTxt(cc);
+  STATE.disclosureText=ntmDisclosure(cc);
+  document.getElementById('comp-robots').textContent=STATE.robotsTxt;
+  document.getElementById('comp-disp').textContent=STATE.disclosureText;
+
   // Request log
   var logHtml='';
   var last25=STATE.rows.slice(-25).reverse();
@@ -806,6 +904,8 @@ document.getElementById('shareLink').addEventListener('click',function(){
   seedSource=stateParams();
   copyText(location.origin+location.pathname+'#'+stateParams());
 });
+document.getElementById('copyRobots').addEventListener('click',function(){copyText(STATE.robotsTxt||'');});
+document.getElementById('copyDisp').addEventListener('click',function(){copyText(STATE.disclosureText||'');});
 
 // Custom UA classifier
 document.getElementById('classifyBtn').addEventListener('click',function(){

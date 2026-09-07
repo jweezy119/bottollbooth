@@ -127,6 +127,37 @@ The demo surfaces this as the **Crawl Purpose & Value Exchange** panel;
 `examples/site-report.js` produces the same numbers as a standalone CLI
 report (`node examples/site-report.js access.log`).
 
+## Compliance layer: CoMP / EU AI-act opt-outs and disclosure
+
+CoMP finalized 2026-04-28 and the EU AI-act transparency duties went live
+2026-08-02 — site owners now need to *publish* their crawl policy, not just
+enforce it. BotTollbooth turns the classified traffic directly into those
+documents, so the disclosure is derived from each site's real answers:
+
+1. **Verdicts** — `recommendCrawler(crawler)` classifies every observed
+   crawler: `training` → `opt-out` (block via robots.txt), `search` → `allow`
+   (keep indexing, they send visitors back), `mixed`/unknown → `review` (the
+   site owner decides; on-demand tools are flagged rather than hidden).
+2. **`robots.txt`** — `robotTxt(crawlers, { namespace })` emits a minimal,
+   deterministic blocklist containing *only* the observed opt-out crawlers,
+   in registry order (unknown crawlers last). Search crawlers are never
+   blocked.
+3. **Opt-out list** — `optOutList(crawlers)` returns the per-crawler table
+   (`key`, `label`, `purpose`, `requests`, `verdict`, `reason`) so an agency
+   or owner sees exactly what will be blocked and why.
+4. **NTM/CoMP disclosure** — `ntmDisclosure(crawlers, opts)` generates the
+   honest disclosure text + JSON for the "networked/automated traffic" note:
+   which AI systems accessed the site, how often, and the basis (training
+   opted out, search permitted). The disclosure JSON chains the report digest
+   and is itself digest-ed, so published disclosures are tamper-evident.
+
+The service exposes it as `GET /api/v1/compliance?namespace=<site>` (returns
+`robotsTxt`, `optOuts`, and the signed `disclosure`); `examples/site-report.js`
+has a `--write-dir` flag that drops `robots.txt`, `opt-outs.json`,
+`disclosure.json`, and `disclosure.txt` ready to publish. The demo shows the
+same output as the **CoMP / EU Opt-out & Disclosure** panel with one-click
+copy.
+
 ## The container
 
 `Dockerfile` builds on `node:22-alpine` — **no build step and no `npm

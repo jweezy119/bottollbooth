@@ -22,7 +22,11 @@ jobs:
           node examples/accesslog-to-ingest.js examples/fixtures/access.log --limit 4 >/dev/null
           cat examples/fixtures/access.log | node examples/accesslog-to-ingest.js --limit 4 >/dev/null
       - name: Run site-report with purpose + digest
-        run: 'node examples/site-report.js examples/fixtures/access.log --namespace shop.example.com | grep -q "digest: sha256"'
+        run: |-
+          node examples/site-report.js examples/fixtures/access.log --namespace shop.example.com | grep -q "digest: sha256"
+          node examples/site-report.js examples/fixtures/access.log --namespace shop.example.com --write-dir /tmp/btb-out >/dev/null
+          grep -q "User-agent: GPTBot" /tmp/btb-out/robots.txt
+          grep -q '"verdict"' /tmp/btb-out/opt-outs.json
       - name: Boot analytics service and hit the API
         run: |
           node src/service/server.js & API_PID=$!
@@ -33,6 +37,9 @@ jobs:
           curl -fsS "http://localhost:8080/api/v1/report?namespace=shop.example.com&rpm=15" | grep -q '"ai-crawler":'
           curl -fsS "http://localhost:8080/api/v1/report?namespace=shop.example.com&rpm=15" | grep -q '"valueExchange"'
           curl -fsS "http://localhost:8080/api/v1/report?namespace=shop.example.com&rpm=15" | grep -q '"digest"'
+          curl -fsS "http://localhost:8080/api/v1/report?namespace=shop.example.com&rpm=15" | grep -q '"crawlers"'
+          curl -fsS "http://localhost:8080/api/v1/compliance?namespace=shop.example.com" | grep -q '"robotsTxt"'
+          curl -fsS "http://localhost:8080/api/v1/compliance?namespace=shop.example.com" | grep -q 'User-agent: GPTBot'
           kill $API_PID
       - name: Build container image
         run: docker build -t bottollbooth:ci .

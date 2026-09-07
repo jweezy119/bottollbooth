@@ -123,6 +123,7 @@ function rowsFromLog(text, opts = {}) {
 
   let rows = hits.map((h) => ({
     userAgent: h.userAgent,
+    at: h.at,
     requestsPerMin: ipRpm[h.ip] || 1,
   }));
 

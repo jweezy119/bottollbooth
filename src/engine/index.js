@@ -219,6 +219,151 @@ function valueExchange(rows) {
 }
 
 /**
+ * Public notes for well-known crawlers with non-obvious controls.
+ */
+const CRAWLER_NOTES = Object.freeze({
+  'Google-Extended': 'also control via Google Search Console (Gemini extensions setting)',
+  'Applebot-Extended': 'blocking does not affect Siri/Spotlight indexing',
+  'Amazonbot': 'blocking also disables Amazon shopping-assistant price comparisons',
+  'CCBot': 'Common Crawl mirrors the public web; robots.txt is the control',
+  'cohere-ai': 'used for model training corpora',
+  'DuckAssistBot': 'DuckDuckGo AI search assistant',
+});
+
+/**
+ * Verdict for a single crawler, derived transparently from its purpose.
+ * training -> opt-out (takes content, sends no visitors back)
+ * search   -> allow (indexes and returns real visitors)
+ * anything else -> review (on-demand/mixed use is a business decision)
+ * @param {{key:string,purpose?:string}|null} meta - as returned by crawlIntent
+ * @returns {{verdict:string, reason:string, mechanism:string}}
+ */
+function recommendCrawler(meta) {
+  if (!meta || !meta.purpose) {
+    return {
+      verdict: 'review',
+      reason: 'Unidentified automated system — confirm the user-agent in your access logs',
+      mechanism: 'manual',
+    };
+  }
+  if (meta.purpose === 'training') {
+    return {
+      verdict: 'opt-out',
+      reason: 'AI training crawler: copies content, returns no visitors',
+      mechanism: 'robots.txt',
+    };
+  }
+  if (meta.purpose === 'search') {
+    return {
+      verdict: 'allow',
+      reason: 'Search crawler: indexes content and sends real visitors back',
+      mechanism: 'none',
+    };
+  }
+  return {
+    verdict: 'review',
+    reason: 'On-demand/mixed crawler: decide whether AI tools may read content on request',
+    mechanism: 'robots.txt',
+  };
+}
+
+function crawlerOrderedKeys(crawlers) {
+  const seen = {};
+  const keys = [];
+  for (const c of CRAWLERS) {
+    if (crawlers[c.key] && !seen[c.key]) { seen[c.key] = 1; keys.push(c.key); }
+  }
+  if (crawlers['unknown-ai'] && !seen['unknown-ai']) {
+    keys.push('unknown-ai');
+  }
+  return keys;
+}
+
+/**
+ * robots.txt block covering the AI training crawlers actually observed.
+ * @param {Record<string,{label:string,purpose:string,requests:number}>} crawlers
+ * @param {{namespace?:string}} [opts]
+ * @returns {string}
+ */
+function robotTxt(crawlers, opts = {}) {
+  const out = ['# bot-tollbooth — generated robots.txt'];
+  if (opts.namespace) out.push(`# site: ${opts.namespace}`);
+  out.push('# Opt-out for the AI training crawlers observed in this traffic,');
+  out.push('# generated from your traffic answers. Search crawlers are not blocked.');
+  let any = false;
+  for (const key of crawlerOrderedKeys(crawlers)) {
+    if (recommendCrawler(crawlers[key]).verdict !== 'opt-out') continue;
+    any = true;
+    out.push('', `User-agent: ${key}`, 'Disallow: /');
+  }
+  if (!any) out.push('', '# No known AI training crawlers observed — nothing to block.');
+  out.push('');
+  return out.join('\n');
+}
+
+/**
+ * Machine-readable opt-out list, one entry per observed crawler.
+ * @param {Record<string,{label:string,purpose:string,requests:number}>} crawlers
+ * @returns {Array<{key:string,label:string,purpose:string,requests:number,verdict:string,reason:string,mechanism:string,note?:string}>}
+ */
+function optOutList(crawlers) {
+  const list = [];
+  for (const key of crawlerOrderedKeys(crawlers)) {
+    const c = crawlers[key];
+    const rec = recommendCrawler(c);
+    const entry = {
+      key,
+      label: c.label,
+      purpose: c.purpose || 'unknown',
+      requests: c.requests,
+      verdict: rec.verdict,
+      reason: rec.reason,
+      mechanism: rec.mechanism,
+    };
+    const note = CRAWLER_NOTES[key];
+    if (note) entry.note = note;
+    list.push(entry);
+  }
+  return list;
+}
+
+/**
+ * NTM / EU AI Act transparency disclosure built from the same answers.
+ * Pair it with `reportDigest` so the disclosure is chained to the report.
+ * @param {Record<string,{label:string,purpose:string,requests:number}>} crawlers
+ * @param {{namespace:string,start?:string,end?:string,reportDigest?:string}} [opts]
+ * @returns {{text:string,json:object}}
+ */
+function ntmDisclosure(crawlers, opts = {}) {
+  const list = optOutList(crawlers);
+  const window = opts.start && opts.end ? `${opts.start} – ${opts.end}` : 'sampled window';
+  const lines = [];
+  lines.push(`NTM / AI-training disclosure — ${opts.namespace || 'site'}`);
+  lines.push(`Window: ${window}`);
+  lines.push('');
+  lines.push('AI systems that accessed this site:');
+  for (const e of list) {
+    lines.push(`  - ${e.label} (${e.key}) — ${e.requests} requests — ${e.purpose} — ${e.verdict}`);
+    if (e.note) lines.push(`      note: ${e.note}`);
+  }
+  lines.push('');
+  lines.push('Basis: training crawlers are opted out via robots.txt; search indexing is');
+  lines.push('permitted and returns visitors; on-demand/mixed crawls remain at the site');
+  lines.push('owner\'s discretion.');
+  lines.push('Bias: purpose labels are vendor-declared — verify against vendor documentation.');
+  if (opts.reportDigest) lines.push(`Report digest: sha256 ${opts.reportDigest}`);
+  const json = {
+    schemaVersion: 1,
+    namespace: opts.namespace || 'site',
+    window: { start: opts.start || null, end: opts.end || null },
+    crawlers: list,
+    basis: 'training crawlers opted out via robots.txt; search indexing permitted; on-demand/mixed at owner discretion',
+    bias: 'purpose labels are vendor-declared',
+  };
+  return { text: lines.join('\n'), json };
+}
+
+/**
  * Estimate ad-revenue lost to bot traffic.
  *
  * @param {{total:number, botRate:number}} summary - output of summarize()
@@ -249,9 +394,14 @@ module.exports = {
   UA_RULES,
   BehaviourWeights,
   CRAWLERS,
+  CRAWLER_NOTES,
   classify,
   crawlIntent,
   summarize,
   valueExchange,
+  recommendCrawler,
+  robotTxt,
+  optOutList,
+  ntmDisclosure,
   revenueImpact,
 };
