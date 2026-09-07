@@ -1,0 +1,24 @@
+{
+  "name": "bottollbooth",
+  "version": "1.0.0",
+  "description": "Bot traffic classification & ad-revenue impact analytics for DeepSeek Harness (Cordis dynamic plugin + standalone engine)",
+  "private": true,
+  "license": "MIT",
+  "scripts": {
+    "test": "node test/engine.test.js",
+    "demo": "node examples/demo.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "cordis",
+    "deepseek-harness",
+    "dsh",
+    "agent",
+    "plugin",
+    "bot-detection",
+    "analytics",
+    "ad-revenue"
+  ]
+}
