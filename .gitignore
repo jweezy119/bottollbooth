@@ -1,5 +1,6 @@
 node_modules/
 *.log
+!examples/fixtures/access.log
 .DS_Store
 .env
 .env.*

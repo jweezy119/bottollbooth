@@ -7,6 +7,7 @@
 
 const assert = require('node:assert');
 const fs = require('node:fs');
+const path = require('node:path');
 const { parseAccessLine, rowsFromLog } = require('../examples/accesslog-to-ingest.js');
 
 // combined format: ip - - [date] "req" 200 bytes "referer" "user-agent"
@@ -34,7 +35,7 @@ assert.strictEqual(parseAccessLine('# just a comment'), null);
 assert.strictEqual(parseAccessLine('not a log line at all'), null);
 
 // fixture end-to-end: rows are produced, threaded, and bursty IPs are flagged
-const text = fs.readFileSync('examples/fixtures/access.log', 'utf8');
+const text = fs.readFileSync(path.join(__dirname, '..', 'examples/fixtures/access.log'), 'utf8');
 const { rows, parsed, skipped } = rowsFromLog(text);
 assert.strictEqual(parsed, 17);
 assert.strictEqual(skipped, 0);
