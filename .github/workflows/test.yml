@@ -35,6 +35,15 @@ jobs:
       - name: Smoke-test the container
         run: |
           docker run -d --rm --name bottollbooth-ci -p 8123:8080 bottollbooth:ci
-          sleep 3
-          curl -fsS http://localhost:8123/health
+          for i in $(seq 1 25); do
+            if curl -fsS http://localhost:8123/health; then break; fi
+            sleep 1
+          done
+          ok=$(curl -fsS -o /dev/null -w '%{http_code}' http://localhost:8123/health 2>/dev/null || echo 000)
+          if [ "$ok" != "200" ]; then
+            echo "container never became ready (http $ok)"
+            docker ps
+            docker logs bottollbooth-ci 2>&1 || true
+            exit 1
+          fi
           docker stop bottollbooth-ci
