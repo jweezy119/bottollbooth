@@ -1,0 +1,30 @@
+name: deploy
+
+# Deploy the service + dashboard to Fly.io whenever the test workflow passes
+# on main, or manually via workflow_dispatch. Requires two one-time secrets in
+# the repo: FLY_API_TOKEN (personal access token from
+# fly.io/user/personal_access_tokens) and BOTTOLLBOOTH_TOKEN (API gate token)
+# as a Fly secret — see the "Deploy to Fly.io" section in the README.
+
+on:
+  workflow_run:
+    workflows: ["test"]
+    branches: [main]
+    types: [completed]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    if: (github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success') && secrets.FLY_API_TOKEN != ''
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run && github.event.workflow_run.head_sha || github.ref }}
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+      - name: Deploy to Fly.io (remote builder)
+        run: flyctl deploy --remote-only --yes
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
