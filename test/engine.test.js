@@ -9,7 +9,9 @@
 const assert = require('node:assert');
 const {
   classify,
+  crawlIntent,
   summarize,
+  valueExchange,
   revenueImpact,
   CATEGORIES,
 } = require('../src/engine/index.js');
@@ -35,7 +37,17 @@ for (const [ua, expected] of cases) {
   assert.strictEqual(category, expected, `expected ${expected} for ${ua}`);
 }
 
-const { userAgent: _, ...feed } = {};
+const intent = (ua) => crawlIntent(ua);
+assert.strictEqual(intent('ClaudeBot/1.0 (anthropic)').purpose, 'training');
+assert.strictEqual(intent('Claude-Web').purpose, 'search');
+assert.strictEqual(intent('GPTBot/1.0').purpose, 'training');
+assert.strictEqual(intent('PerplexityBot/1.0').purpose, 'search');
+assert.strictEqual(intent('Googlebot/2.1').purpose, 'search');
+assert.strictEqual(intent('Googlebot/2.1').ppr, 5.4);
+assert.strictEqual(intent('Applebot-Extended/1.0').purpose, 'training'); // first-match beats search Applebot
+assert.strictEqual(intent('Mozilla/5.0 Firefox/127' ), null);
+assert.strictEqual(intent(undefined), null);
+
 const rows = [
   { userAgent: 'Chrome/126 real browser', behaviourScore: 0 },
   { userAgent: 'GPTBot/1.0' },
@@ -43,6 +55,17 @@ const rows = [
   { userAgent: 'Googlebot/2.1' },
   { userAgent: 'Firefox/127 human', dwellMs: 60_000 },
 ];
+
+const exchange = valueExchange(rows);
+assert.strictEqual(exchange.automatedRequests, 2); // GPTBot + Googlebot
+assert.strictEqual(exchange.byPurpose.training, 1);
+assert.strictEqual(exchange.byPurpose.search, 1);
+const expectedReturned = 1 / 1091 + 1 / 5.4;
+assert.ok(Math.abs(exchange.estimatedReferralsReturned - expectedReturned) < 1e-12);
+// returns are dominated by search referrals: 1 GPTBot training page returns ~0.001 visitors
+assert.ok(exchange.estimatedReferralsReturned < 1);
+assert.ok(exchange.pagesPerReferral < 100);
+assert.strictEqual(valueExchange([]).automatedRequests, 0);
 
 const summary = summarize(rows);
 assert.strictEqual(summary.total, 5);

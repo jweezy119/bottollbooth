@@ -83,4 +83,13 @@ assert.strictEqual(first, second, 'same hash must reproduce the identical datase
 assert.ok(sandbox.stateParams().includes('pr=ecommerce'));
 assert.ok(sandbox.stateParams().includes('per=30d'));
 
+const ve = sandbox.valueExchange(rows);
+assert.ok(ve.automatedRequests > 0, 'value exchange sees crawl requests');
+assert.ok(ve.byPurpose.training > 0, 'ecommerce profile generates training crawl traffic');
+assert.strictEqual(sandbox.crawlIntent('GPTBot/1.2 (+https://openai.com/gptbot)').purpose, 'training');
+assert.strictEqual(sandbox.crawlIntent('Googlebot/2.1 (+http://www.google.com/bot.html)').purpose, 'search');
+assert.strictEqual(sandbox.crawlIntent('Totally unknown UA/99'), null);
+assert.ok(typeof ve.estimatedReferralsReturned === 'number');
+assert.ok(ve.pagesPerReferral === null || ve.pagesPerReferral > 0);
+
 console.log('demo.test.js: all assertions passed.');

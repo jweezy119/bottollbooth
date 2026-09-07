@@ -6,7 +6,7 @@
  */
 
 const assert = require('node:assert');
-const { ingest, aggregate } = require('../src/service/ingest.js');
+const { ingest, aggregate, reportDigest } = require('../src/service/ingest.js');
 
 const NS = 'store.example.com';
 
@@ -30,6 +30,19 @@ assert.strictEqual(report.summary.byCategory.monitoring, 1);
 
 // revenueImpact consistency: 4 bots / 1000 * 15 * 0.5 = 0.03
 assert.ok(Math.abs(report.impact.recoveredMonthly - 0.03) < 1e-9);
+
+// value exchange: GPTBot (training, ppr 1091) + Googlebot (search, ppr 5.4)
+assert.strictEqual(report.valueExchange.automatedRequests, 2);
+assert.strictEqual(report.valueExchange.byPurpose.training, 1);
+assert.strictEqual(report.valueExchange.byPurpose.search, 1);
+const expectedReturned = 1 / 1091 + 1 / 5.4;
+assert.ok(Math.abs(report.valueExchange.estimatedReferralsReturned - expectedReturned) < 1e-12);
+
+// digest is deterministic and tamper-evident
+assert.ok(/^[0-9a-f]{64}$/.test(report.digest));
+assert.strictEqual(reportDigest({ summary: report.summary, impact: report.impact, extra: 1 }),
+  reportDigest({ extra: 1, impact: report.impact, summary: report.summary }));
+assert.notStrictEqual(report.digest, reportDigest({ ...report, generatedAt: 'tampered' }));
 
 let threw = false;
 try { ingest('', []); } catch { threw = true; }

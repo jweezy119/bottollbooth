@@ -272,7 +272,9 @@ that reinforces transparency instead of replacing substance with rails.
   BYOD access-log ingest. Done.
 - **L2 — Value-exchange products.** Crawl-to-referral framing, purpose
   breakdowns, per-client reports for agencies, signed report digests.
-  (North Stars 1, 4 — Tier 1 web3.)
+  Delivered: `CRAWLERS` registry (purpose + ppr per crawler), `valueExchange()`,
+  `examples/site-report.js`, sha256 report digest, demo "Crawl Purpose & Value
+  Exchange" panel. (North Stars 1, 4 — Tier 1 web3.)
 - **L3 — Trust layer.** Crawler/agent registry with credentialed identities
   + CoMP/EU-compliance reporter + anchored audit logs.
   (North Stars 2, 3 — Tier 1/2 web3.)

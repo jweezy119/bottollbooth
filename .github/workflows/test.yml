@@ -21,6 +21,8 @@ jobs:
         run: |
           node examples/accesslog-to-ingest.js examples/fixtures/access.log --limit 4 >/dev/null
           cat examples/fixtures/access.log | node examples/accesslog-to-ingest.js --limit 4 >/dev/null
+      - name: Run site-report with purpose + digest
+        run: node examples/site-report.js examples/fixtures/access.log --namespace shop.example.com | grep -q "digest: sha256"
       - name: Boot analytics service and hit the API
         run: |
           node src/service/server.js & API_PID=$!
@@ -29,6 +31,8 @@ jobs:
           curl -fsS "http://localhost:8080/api/v1/classify?ua=Bytespider" | grep -q '"category":"ai-crawler"'
           node examples/accesslog-to-ingest.js examples/fixtures/access.log --post http://localhost:8080 --namespace shop.example.com
           curl -fsS "http://localhost:8080/api/v1/report?namespace=shop.example.com&rpm=15" | grep -q '"ai-crawler":'
+          curl -fsS "http://localhost:8080/api/v1/report?namespace=shop.example.com&rpm=15" | grep -q '"valueExchange"'
+          curl -fsS "http://localhost:8080/api/v1/report?namespace=shop.example.com&rpm=15" | grep -q '"digest"'
           kill $API_PID
       - name: Build container image
         run: docker build -t bottollbooth:ci .

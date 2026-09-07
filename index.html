@@ -214,6 +214,10 @@
   /* Two-column layout */
   .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
   @media (max-width: 768px) { .two-col { grid-template-columns: 1fr; } .ctrl-grid { grid-template-columns: 1fr; } }
+
+  .ve-summary { display: flex; gap: 18px; margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--border-light); color: var(--muted); font-size: 0.82em; flex-wrap: wrap; }
+  .ve-summary span { display: inline-flex; align-items: center; gap: 6px; }
+  .ve-summary strong { color: var(--text); font-weight: 500; }
 </style>
 </head>
 <body>
@@ -351,6 +355,17 @@
   </div>
 </div>
 
+<!-- VALUE EXCHANGE -->
+<div class="panel">
+  <div class="panel-title">🎯 Crawl Purpose &amp; Value Exchange</div>
+  <div class="panel-desc">Not all crawls are equal. AI <strong>training</strong> crawlers copy your content and send no visitors back; <strong>search</strong> crawlers pay you back with organic visits. This panel shows the true exchange rate for your traffic.</div>
+  <table class="cat-table">
+    <thead><tr><th>Purpose</th><th>Requests</th><th>Share of crawls</th><th>Returned to you</th></tr></thead>
+    <tbody id="ve-body"></tbody>
+  </table>
+  <div class="ve-summary" id="ve-summary"></div>
+</div>
+
 <!-- CLASSIFY YOUR OWN -->
 <div class="panel">
   <div class="panel-title">🔍 Classify Any User-Agent</div>
@@ -368,6 +383,9 @@
     </div>
     <div class="cr-row" style="margin-top:6px">
       <span class="cr-label">Signal</span> <span id="cr-signal"></span>
+    </div>
+    <div class="cr-row" style="margin-top:6px">
+      <span class="cr-label">Purpose</span> <span id="cr-purpose"></span>
     </div>
   </div>
 </div>
@@ -429,6 +447,52 @@ function summarize(rows){
 function revenueImpact(s,rpm,fillScale){
   var f=(typeof fillScale==='number'?fillScale:50)/100;
   return{monthlyVisitors:s.total,botVisitors:s.bot,botRate:s.botRate,recoveredMonthly:(s.bot/1000)*rpm*f};
+}
+
+// Crawler metadata — purpose + crawl-to-referral cost (pages crawled per one
+// real visitor referred back, public 2026 data: ClaudeBot ~38k:1, GPTBot
+// ~1091:1, Perplexity ~195:1, Google ~5.4:1). `ppr:null` = no known return.
+var CRAWLERS=[
+  {key:'GPTBot',re:/\bGPTBot\b/i,label:'GPTBot (OpenAI)',purpose:'training',ppr:1091},
+  {key:'ChatGPT-User',re:/\bChatGPT-User\b/i,label:'ChatGPT-User (OpenAI)',purpose:'user-action',ppr:null},
+  {key:'OAI-SearchBot',re:/\bOAI-SearchBot\b/i,label:'OAI-SearchBot (OpenAI)',purpose:'search',ppr:null},
+  {key:'ClaudeBot',re:/\bClaudeBot\b/i,label:'ClaudeBot (Anthropic)',purpose:'training',ppr:38000},
+  {key:'Claude-Web',re:/\bClaude-Web\b/i,label:'Claude-Web (Anthropic)',purpose:'search',ppr:null},
+  {key:'PerplexityBot',re:/\bPerplexityBot\b/i,label:'PerplexityBot',purpose:'search',ppr:195},
+  {key:'Google-Extended',re:/\bGoogle-Extended\b/i,label:'Google-Extended',purpose:'training',ppr:null},
+  {key:'CCBot',re:/\bCCBot\b/i,label:'CCBot (Common Crawl)',purpose:'training',ppr:null},
+  {key:'Applebot-Extended',re:/\bApplebot-Extended\b/i,label:'Applebot-Extended',purpose:'training',ppr:null},
+  {key:'Amazonbot',re:/\bAmazonbot\b/i,label:'Amazonbot',purpose:'mixed',ppr:null},
+  {key:'Meta-ExternalAgent',re:/\bMeta-ExternalAgent\b/i,label:'Meta-ExternalAgent',purpose:'user-action',ppr:null},
+  {key:'Bytespider',re:/\bBytespider\b/i,label:'Bytespider (ByteDance)',purpose:'training',ppr:null},
+  {key:'cohere-ai',re:/\bcohere-ai\b|\bCohere\b/i,label:'cohere-ai',purpose:'training',ppr:null},
+  {key:'DuckAssistBot',re:/\bDuckAssistBot\b/i,label:'DuckAssistBot (DuckDuckGo)',purpose:'search',ppr:null},
+  {key:'Googlebot',re:/\bGooglebot\b/i,label:'Googlebot (search)',purpose:'search',ppr:5.4},
+  {key:'bingbot',re:/\bbingbot\b/i,label:'bingbot (search)',purpose:'search',ppr:10},
+  {key:'DuckDuckBot',re:/\bDuckDuckBot\b/i,label:'DuckDuckBot (search)',purpose:'search',ppr:8},
+  {key:'Applebot',re:/\bApplebot\b/i,label:'Applebot (search)',purpose:'search',ppr:6}
+];
+
+function crawlIntent(ua){
+  if(!ua)return null;
+  for(var i=0;i<CRAWLERS.length;i++){
+    if(CRAWLERS[i].re.test(ua))return{label:CRAWLERS[i].label,purpose:CRAWLERS[i].purpose,ppr:CRAWLERS[i].ppr};
+  }
+  return null;
+}
+
+function valueExchange(rows){
+  var byPurpose={training:0,search:0,'user-action':0,mixed:0};
+  var byReturn={training:0,search:0,'user-action':0,mixed:0};
+  var automated=0,returned=0;
+  for(var i=0;i<rows.length;i++){
+    var c=crawlIntent(rows[i].userAgent);
+    if(!c)continue;
+    automated++;
+    byPurpose[c.purpose]=(byPurpose[c.purpose]||0)+1;
+    if(typeof c.ppr==='number'&&c.ppr>0){returned+=1/c.ppr;byReturn[c.purpose]+=1/c.ppr;}
+  }
+  return{automatedRequests:automated,byPurpose:byPurpose,byReturn:byReturn,estimatedReferralsReturned:returned,pagesPerReferral:automated>0&&returned>0?automated/returned:null};
 }
 
 // ==============================
@@ -594,6 +658,28 @@ function render(){
   }
   document.getElementById('cat-tbody').innerHTML=tbody;
 
+  // Value exchange
+  var ve=valueExchange(STATE.rows);
+  var PURPOSE_INFO={training:{label:'Training corpora',pill:'ai-crawler',desc:'Takes content, sends no visitors'},search:{label:'Search indexing',pill:'search-engine',desc:'Returns real visitors via organic search'},'user-action':{label:'Live answers',pill:'ai-crawler',desc:'On-demand, little/no measurable return'},mixed:{label:'Mixed use',pill:'ai-crawler',desc:'Vendor uses content for several purposes'}};
+  var PURPOSE_KEYS=['training','search','user-action','mixed'];
+  var veHtml='';
+  for(var pi=0;pi<PURPOSE_KEYS.length;pi++){
+    var pk=PURPOSE_KEYS[pi],pn=ve.byPurpose[pk]||0;
+    if(!pn)continue;
+    var share=ve.automatedRequests?Math.round(pn/ve.automatedRequests*1000)/10:0;
+    var retText='no known return';
+    var retVal=ve.byReturn[pk]||0;
+    if(retVal>0) retText='≈ '+retVal.toFixed(3)+' visitors';
+    veHtml+='<tr><td><span class="pill '+PURPOSE_INFO[pk].pill+'">'+PURPOSE_INFO[pk].label+'</span></td><td>'+pn+'</td><td>'+share+'%</td><td style="color:var(--subtle);font-size:0.82em">'+retText+' — '+PURPOSE_INFO[pk].desc+'</td></tr>';
+  }
+  document.getElementById('ve-body').innerHTML=veHtml;
+  var veStats=ve.automatedRequests
+    ? '<span><strong>'+ve.automatedRequests+'</strong> crawl requests counted</span>'
+      +'<span>≈ <strong>'+ve.estimatedReferralsReturned.toFixed(2)+'</strong> visitors returned</span>'
+      +'<span>ratio ≈ <strong>'+(ve.pagesPerReferral?ve.pagesPerReferral.toFixed(0):'—')+'</strong> pages/visitor</span>'
+    : '<span>No known-crawl traffic in this sample.</span>';
+  document.getElementById('ve-summary').innerHTML=veStats;
+
   // Request log
   var logHtml='';
   var last25=STATE.rows.slice(-25).reverse();
@@ -729,10 +815,13 @@ document.getElementById('classifyBtn').addEventListener('click',function(){
   var catEl=document.getElementById('cr-cat');
   var confEl=document.getElementById('cr-conf');
   var sigEl=document.getElementById('cr-signal');
+  var purpEl=document.getElementById('cr-purpose');
   catEl.className='pill '+result.category;
   catEl.textContent=CAT_INFO[result.category]?CAT_INFO[result.category].label:result.category;
   confEl.textContent=Math.round(result.confidence*100)+'%';
   sigEl.textContent=result.signal;
+  var meta=crawlIntent(ua);
+  purpEl.textContent=meta?meta.label+' — '+meta.purpose+(meta.ppr?' ('+meta.ppr+' pages/visitor ref.)':''):'—';
   el.classList.add('show');
 });
 document.getElementById('customUA').addEventListener('keydown',function(e){

@@ -85,6 +85,52 @@ const BehaviourWeights = Object.freeze({
 });
 
 /**
+ * Crawler metadata: purpose + crawl-to-referral cost (pages crawled per one
+ * real visitor referred back). Grounded in public 2026 data (Cloudflare Radar
+ * crawl-to-referral ratios & crawler purpose splits): ClaudeBot ~38,000:1,
+ * GPTBot ~1,091:1, Perplexity ~195:1, Google ~5.4:1. This is the *value
+ * exchange*: how much content a crawler takes versus how much traffic it
+ * gives back. `ppr: null` means no published/known return.
+ */
+const CRAWLERS = Object.freeze([
+  // AI / LLM crawlers
+  { key: 'GPTBot', re: /\bGPTBot\b/i, label: 'GPTBot (OpenAI)', purpose: 'training', ppr: 1091 },
+  { key: 'ChatGPT-User', re: /\bChatGPT-User\b/i, label: 'ChatGPT-User (OpenAI)', purpose: 'user-action', ppr: null },
+  { key: 'OAI-SearchBot', re: /\bOAI-SearchBot\b/i, label: 'OAI-SearchBot (OpenAI)', purpose: 'search', ppr: null },
+  { key: 'ClaudeBot', re: /\bClaudeBot\b/i, label: 'ClaudeBot (Anthropic)', purpose: 'training', ppr: 38000 },
+  { key: 'Claude-Web', re: /\bClaude-Web\b/i, label: 'Claude-Web (Anthropic)', purpose: 'search', ppr: null },
+  { key: 'PerplexityBot', re: /\bPerplexityBot\b/i, label: 'PerplexityBot', purpose: 'search', ppr: 195 },
+  { key: 'Google-Extended', re: /\bGoogle-Extended\b/i, label: 'Google-Extended', purpose: 'training', ppr: null },
+  { key: 'CCBot', re: /\bCCBot\b/i, label: 'CCBot (Common Crawl)', purpose: 'training', ppr: null },
+  { key: 'Applebot-Extended', re: /\bApplebot-Extended\b/i, label: 'Applebot-Extended', purpose: 'training', ppr: null },
+  { key: 'Amazonbot', re: /\bAmazonbot\b/i, label: 'Amazonbot', purpose: 'mixed', ppr: null },
+  { key: 'Meta-ExternalAgent', re: /\bMeta-ExternalAgent\b/i, label: 'Meta-ExternalAgent', purpose: 'user-action', ppr: null },
+  { key: 'Bytespider', re: /\bBytespider\b/i, label: 'Bytespider (ByteDance)', purpose: 'training', ppr: null },
+  { key: 'cohere-ai', re: /\bcohere-ai\b|\bCohere\b/i, label: 'cohere-ai', purpose: 'training', ppr: null },
+  { key: 'DuckAssistBot', re: /\bDuckAssistBot\b/i, label: 'DuckAssistBot (DuckDuckGo)', purpose: 'search', ppr: null },
+  // Search engines — the return side of the value exchange
+  { key: 'Googlebot', re: /\bGooglebot\b/i, label: 'Googlebot (search)', purpose: 'search', ppr: 5.4 },
+  { key: 'bingbot', re: /\bbingbot\b/i, label: 'bingbot (search)', purpose: 'search', ppr: 10 },
+  { key: 'DuckDuckBot', re: /\bDuckDuckBot\b/i, label: 'DuckDuckBot (search)', purpose: 'search', ppr: 8 },
+  { key: 'Applebot', re: /\bApplebot\b/i, label: 'Applebot (search)', purpose: 'search', ppr: 6 },
+]);
+
+/**
+ * Look up a user-agent against the crawler registry.
+ * @param {string} userAgent
+ * @returns {{key:string,label:string,purpose:string,ppr:number|null}|null}
+ */
+function crawlIntent(userAgent) {
+  if (!userAgent) return null;
+  for (const c of CRAWLERS) {
+    if (c.re.test(userAgent)) {
+      return { key: c.key, label: c.label, purpose: c.purpose, ppr: c.ppr };
+    }
+  }
+  return null;
+}
+
+/**
  * @typedef {object} RequestRow
  * @property {string} userAgent
  * @property {number} [behaviourScore]  0..12 raw heuristic score (optional)
@@ -146,6 +192,33 @@ function summarize(rows) {
 }
 
 /**
+ * The value exchange: how many automated requests each crawl *purpose* sent,
+ * and how many real visitors the crawlers gave back (pages / pages-per-referral).
+ * Accepts raw request rows (UA present) or stored entries (privacy-shifted,
+ * carrying `purpose` + `ppr` directly).
+ * @param {Array<{userAgent?:string,purpose?:string,ppr?:number|null}>} rows
+ * @returns {{automatedRequests:number, byPurpose:Record<string,number>, estimatedReferralsReturned:number, pagesPerReferral:number|null}}
+ */
+function valueExchange(rows) {
+  const byPurpose = { training: 0, search: 0, 'user-action': 0, mixed: 0 };
+  let automated = 0;
+  let returned = 0;
+  for (const r of rows) {
+    const meta = r.purpose ? { purpose: r.purpose, ppr: r.ppr } : crawlIntent(r.userAgent);
+    if (!meta) continue;
+    automated += 1;
+    byPurpose[meta.purpose] = (byPurpose[meta.purpose] || 0) + 1;
+    if (typeof meta.ppr === 'number' && meta.ppr > 0) returned += 1 / meta.ppr;
+  }
+  return {
+    automatedRequests: automated,
+    byPurpose,
+    estimatedReferralsReturned: returned,
+    pagesPerReferral: automated > 0 && returned > 0 ? automated / returned : null,
+  };
+}
+
+/**
  * Estimate ad-revenue lost to bot traffic.
  *
  * @param {{total:number, botRate:number}} summary - output of summarize()
@@ -175,7 +248,10 @@ module.exports = {
   CATEGORIES,
   UA_RULES,
   BehaviourWeights,
+  CRAWLERS,
   classify,
+  crawlIntent,
   summarize,
+  valueExchange,
   revenueImpact,
 };

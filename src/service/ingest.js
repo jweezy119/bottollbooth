@@ -16,9 +16,10 @@
  * self-hostable anywhere (a VPS, a Lambda/Cloud Run function, or on-prem).
  */
 
-const { classify, revenueImpact } = require('../engine/index.js');
+const crypto = require('node:crypto');
+const { classify, crawlIntent, revenueImpact, valueExchange } = require('../engine/index.js');
 
-/** In-memory store: namespace -> Array<{category, confidence, at}> */
+/** In-memory store: namespace -> Array<{category, purpose, ppr, confidence, at}> */
 const buckets = new Map();
 
 /**
@@ -35,7 +36,14 @@ function ingest(namespace, rows) {
   let accepted = 0;
   for (const row of rows) {
     const { category, confidence } = classify(row);
-    entries.push({ category, confidence, at: Date.now() });
+    const meta = crawlIntent(row.userAgent);
+    entries.push({
+      category,
+      confidence,
+      purpose: meta ? meta.purpose : null,
+      ppr: meta && typeof meta.ppr === 'number' ? meta.ppr : null,
+      at: Date.now(),
+    });
     accepted += 1;
   }
   if (entries.length > 200_000) entries.splice(0, entries.length - 200_000);
@@ -43,8 +51,25 @@ function ingest(namespace, rows) {
   return { received: rows.length, accepted };
 }
 
+function canonical(obj) {
+  if (Array.isArray(obj)) return obj.map(canonical);
+  if (obj && typeof obj === 'object') {
+    return Object.fromEntries(
+      Object.keys(obj).sort().map((k) => [k, canonical(obj[k])]),
+    );
+  }
+  return obj;
+}
+
+function reportDigest(report) {
+  return crypto
+    .createHash('sha256')
+    .update(JSON.stringify(canonical(report)))
+    .digest('hex');
+}
+
 /**
- * Produce the aggregate summary + revenue impact for a namespace.
+ * Produce the aggregate summary + purpose/value-exchange + revenue impact.
  * @param {string} namespace
  * @param {number} rpm - site revenue per 1,000 monetized impressions
  * @param {number} [fillScale] - 0..100, how much bot traffic monetizes (default 50)
@@ -63,11 +88,13 @@ function aggregate(namespace, rpm, fillScale = 50) {
     byCategory,
     botRate: total ? bot / total : 0,
   };
-  return {
+  const report = {
     summary,
     impact: revenueImpact(summary, rpm, { botFillScale: fillScale / 100 }),
+    valueExchange: valueExchange(entries),
     generatedAt: new Date().toISOString(),
   };
+  return { ...report, digest: reportDigest(report) };
 }
 
-module.exports = { ingest, aggregate };
+module.exports = { ingest, aggregate, reportDigest };

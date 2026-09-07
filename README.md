@@ -65,6 +65,7 @@ that should be simple, transparent facts.
 node test/engine.test.js             # smoke-test the classifier
 node examples/demo.js --rpm 15        # CLI demo of the revenue impact
 node examples/accesslog-to-ingest.js  # BYOD: parse a real access log
+node examples/site-report.js access.log  # full purpose + value-exchange report
 ```
 
 ### Try the live dashboard
@@ -154,6 +155,7 @@ src/engine/                 Pure classification + revenue-impact engine
 src/service/                The installable analytics service (ingest + aggregate + classify)
 examples/demo.js            Standalone CLI demo of the engine
 examples/accesslog-to-ingest.js  BYOD: turn a real access log into /api/v1/ingest rows
+examples/site-report.js    End-to-end report: traffic mix + purpose + value exchange + sha256 digest
 examples/fixtures/access.log     Sample combined-format log (tests + CI)
 test/                       Smoke tests (zero-dependency)
 docs/architecture.md        How the product is built and deployed

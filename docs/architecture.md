@@ -102,6 +102,31 @@ that:
 Feed the output of any log pipeline you already run (Nginx, Cloudflare
 logs, ELK) straight into the same endpoint.
 
+## Value layer: purpose and value exchange
+
+A second pass over the classified traffic produces the three numbers a site
+owner actually cares about:
+
+1. **Crawl purpose** — each known AI/search user-agent is resolved to a
+   declared purpose (`training`, `search`, `user-action`, `mixed`) via the
+   crawler metadata registry (`CRAWLERS` in `src/engine/index.js`). The
+   registry also carries a `pagesPerReferral` ratio grounded in public 2026
+   crawl-to-referral data (ClaudeBot ≈ 38,000:1, GPTBot ≈ 1,091:1,
+   Perplexity ≈ 195:1, Google ≈ 5.4:1) so we can estimate how many real
+   visitors a crawl type actually gives back.
+2. **Value exchange** — `valueExchange(rows)` counts crawl requests by purpose
+   and estimates how many visitors each purpose returned (`1/ppr` per entry).
+   The headline ratio — pages crawled per real visitor returned — is the
+   transparency answer to "are these crawlers worth hosting?"
+3. **Tamper-evident digest** — every aggregate report is wrapped in a
+   deterministic sha256 digest (canonical sorted JSON). The digest lets a site
+   owner, agency, or auditor prove a report hasn't been edited after the fact,
+   and forms the anchor for the SAS/VC layer described in `docs/strategy.md`.
+
+The demo surfaces this as the **Crawl Purpose & Value Exchange** panel;
+`examples/site-report.js` produces the same numbers as a standalone CLI
+report (`node examples/site-report.js access.log`).
+
 ## The container
 
 `Dockerfile` builds on `node:22-alpine` — **no build step and no `npm
