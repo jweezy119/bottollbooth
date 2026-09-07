@@ -114,6 +114,7 @@ examples/demo.js            Standalone CLI demo of the engine
 test/                       Smoke tests (zero-dependency)
 docs/architecture.md        How the product is built and deployed
 docs/monetization.md        The honest, fair-pricing business model
+docs/strategy.md            Competition, benefit analysis, north stars, web3
 ```
 
 ---
