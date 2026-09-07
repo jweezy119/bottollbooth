@@ -14,6 +14,10 @@ demo, and a smoke test. No build step, no TypeScript, no bundler — the whole
 thing is vanilla JS by design, because that is what the DSH Cordis runtime
 installs: plain function bodies that return a Cordis plugin.
 
+### **[Live Demo →](https://jweezy119.github.io/bottollbooth/)**
+
+Interactive browser demo with adjustable RPM, sample feed generator, and real-time category breakdown. Zero install, zero server.
+
 ---
 
 ## Why this exists
@@ -38,6 +42,7 @@ owner, and — as a monetization experiment — carries a single affiliate CTA
 ## Repo layout
 
 ```
+index.html                Live interactive demo (GitHub Pages — run entirely in the browser)
 src/host/engine.js        Pure traffic-classification + revenue-impact engine
 src/host/plugin.host.js   The Cordis HOST-half plugin body (JSON-RPC handlers)
 src/client/plugin.client.js The Cordis CLIENT-half plugin body (dashboard UI)
