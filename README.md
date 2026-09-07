@@ -1,6 +1,6 @@
 # BotTollbooth
 
-**Transparent traffic intelligence for the open web.**
+**Separate the bots from the buyers.**
 
 [![tests](https://github.com/jweezy119/bottollbooth/actions/workflows/test.yml/badge.svg)](https://github.com/jweezy119/bottollbooth/actions/workflows/test.yml)
 [![live demo](https://img.shields.io/badge/live%20demo-gh%20pages-blueviolet)](https://jweezy119.github.io/bottollbooth/)
@@ -72,6 +72,22 @@ node examples/demo.js --rpm 15    # CLI report for a simulated site
 
 No `npm install` is required anywhere in this repo — plain Node.js (>=18).
 
+## Run the app (hosted dashboard + API)
+
+```bash
+BOTTOLLBOOTH_TOKEN=mysecret docker compose up --build
+# open http://localhost:8080/app        — workspaces, live reports, audits
+# open http://localhost:8080/audit      — paste-a-URL external audit
+# API: http://localhost:8080/api/v1/... (Bearer token required)
+```
+
+The dashboard is a zero-dependency single page that talks to the service:
+create a **workspace** (namespace), load sample traffic or send your real
+log rows via `/api/v1/ingest`, read the live report (mix, value exchange,
+bandwidth, compliance pack with sha256 digest), run an **external audit** on
+any URL, and export JSON. Workspaces persist across restarts as JSON files
+under `DATA_DIR` (default `data/service/`) — no database required.
+
 ## Use it as a library (SDK)
 
 ```js
@@ -134,8 +150,10 @@ in-browser with a CSP, so nothing else is needed to explore.
 | `GET /api/v1/report?namespace=x&rpm=15` | Traffic mix, value exchange, bandwidth cost, revenue impact, sha256 digest |
 | `GET /api/v1/compliance?namespace=x` | Generated `robots.txt`, opt-out list, CoMP/EU disclosure |
 | `GET /api/v1/classify?ua=<user-agent>` | Live lookup → `category`, `confidence`, `signal` |
+| `GET /api/v1/namespaces` | Workspace list + stored audits (powered by `src/service/store.js`) |
 | `POST /api/v1/audit` | Ethical external site audit (`{url}`) → bots policy, WAF, security headers, egress cost, deployable opt-out block |
 | `GET /audit` | Hosted "paste a URL" audit page (`audit.html`) |
+| `GET /app` | Hosted workspace dashboard (`app.html`) |
 | `GET /probe.js` | Embeddable browser probe (headless / sensor client signals) |
 | `GET /health` | Liveness probe |
 
@@ -224,7 +242,7 @@ user-adjustable). SMB owners get a defensible number instead of a scare.
 | **Security-minded tooling** | token-gated API, security headers, CSP demo, deterministic report digests, non-root container |
 | **Browser-telemetry engineering** | `src/probe/` — headless / sensor client-signal collection into the same transparent classifier |
 | **Ethical scanning / SSRF-safe crawler** | `src/audit/` — robots-respecting external audit: per-crawler bots policy, WAF/security headers, egress cost, deployable opt-out |
-| **Product & B2B framing** | bandwidth-cost + revenue-impact modelling, pricing tiers, docs for non-technical owners ([docs/monetization.md](docs/monetization.md)) |
+| **Product & B2B framing** | hosted workspace dashboard (`app.html`), persistence layer, bandwidth-cost + revenue-impact modelling, pricing tiers, docs for non-technical owners ([docs/monetization.md](docs/monetization.md)) |
 | **Documentation & strategy** | [docs/architecture.md](docs/architecture.md), [docs/strategy.md](docs/strategy.md) — competition, north stars, web3 roadmap |
 
 ## Project docs
@@ -235,11 +253,13 @@ user-adjustable). SMB owners get a defensible number instead of a scare.
 
 ## Roadmap (what's next)
 
+- **Deploy the app somewhere real** — pick a host for the service + dashboard
+  (Fly.io / Railway / Render) and add a one-click launch button to this README.
 - **Signed, anchorable reports** — SAS-verified digests so a report can be
   notarized over time (strategy Tier 1).
 - **Crawler/agent identity registry** — credentialed identities for the
   purpose metadata, opening an app-store-style trust layer.
-- **Managed multi-tenant service** — the `$9`/`$79` tiers suggested on the
+- **Hardened multi-tenant service** — the `$9`/`$79` tiers suggested on the
   demo: hosted ingest + probe endpoint, token-protected API, and white-label
   agency reports.
 

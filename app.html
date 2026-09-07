@@ -1,0 +1,290 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BotTollbooth — Workspace Dashboard</title>
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; connect-src 'self'; img-src 'self' data:; frame-ancestors 'none'">
+<style>
+:root{--bg:#f6f7f9;--card:#fff;--ink:#1a1d24;--muted:#5b6172;--line:#e3e6ee;--accent:#5046e5;--good:#0e9f6e;--warn:#d98324;--bad:#d64545}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 -apple-system,"Segoe UI",Roboto,sans-serif}
+.wrap{max-width:960px;margin:0 auto;padding:28px 20px 72px}
+.top{display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:10px;font-weight:800;font-size:18px}
+.brand .dot{width:12px;height:12px;border-radius:50%;background:var(--accent)}
+.tagline{color:var(--muted);font-size:13px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px;margin-top:14px}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+label{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);display:block;margin:10px 0 4px}
+input{width:100%;padding:11px 12px;border:1px solid var(--line);border-radius:9px;font:inherit;background:#fff}
+input:focus{border-color:var(--accent);box-shadow:0 0 0 2px rgba(80,70,229,.15)}
+button{cursor:pointer;border:0;border-radius:9px;padding:11px 16px;font:inherit;font-weight:700;background:var(--accent);color:#fff}
+button.ghost{background:transparent;color:var(--accent);border:1px solid var(--accent)}
+button.small{padding:6px 12px;font-size:13px}
+button:disabled{opacity:.55;cursor:wait}
+.chip{display:inline-block;margin:4px 6px 0 0;padding:4px 12px;border-radius:99px;font-size:13px;background:#eef0f5;cursor:pointer;border:1px solid transparent}
+.chip.active{border-color:var(--accent);background:rgba(80,70,229,.08);font-weight:700}
+.msg{font-size:13px;color:var(--muted);margin-top:8px}
+h2{font-size:14px;margin:22px 0 8px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}
+.hidden{display:none}
+.metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-top:8px}
+.metric{padding:12px;border:1px solid var(--line);border-radius:10px}
+.metric .v{font-size:20px;font-weight:800}
+.metric .l{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.03em}
+.bar-row{display:grid;grid-template-columns:140px 1fr 46px;gap:8px;align-items:center;margin:5px 0;font-size:13px}
+.bar{height:14px;border-radius:7px;background:#eef0f5;overflow:hidden}
+.bar i{display:block;height:100%;background:var(--accent)}
+.human i{background:var(--good)}
+.ai-crawler i{background:var(--accent)}
+.search-engine i{background:#34b7c5}.monitoring i{background:#8b5cf6}.spam i{background:var(--bad)}
+table{width:100%;border-collapse:collapse;font-size:13px;margin-top:6px}
+td,th{border-bottom:1px solid var(--line);padding:7px 6px;text-align:left}
+td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+.pill{display:inline-block;padding:2px 9px;border-radius:99px;font-size:12px;font-weight:700}
+.pill.ok{background:#e6f7f1;color:var(--good)}.pill.warn{background:#fdf0e2;color:var(--warn)}.pill.bad{background:#fdeaea;color:var(--bad)}.pill.mut{background:#eef0f5;color:var(--muted)}
+pre{background:#0f1218;color:#d5d9e4;padding:14px;border-radius:10px;overflow-x:auto;font:12px/1.55 ui-monospace,SFMono-Regular,Menlo,monospace;margin:6px 0 0}
+pre.ready{background:#0b1f1a;color:#8ce0c3}
+.copy{float:right;margin-left:8px}
+.grade{width:64px;height:64px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:30px;font-weight:800;color:#fff;margin-right:12px}
+.vcol{display:flex;flex-direction:column;gap:6px;min-width:240px}
+footer{margin-top:36px;color:var(--muted);font-size:12px}
+footer a{color:var(--accent)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <div class="brand"><span class="dot"></span> BotTollbooth</div>
+    <div class="tagline">Separate the bots from the buyers.</div>
+  </div>
+
+  <div class="card">
+    <label for="token">API token (Bearer, required)</label>
+    <div class="row" style="flex-wrap:nowrap">
+      <input id="token" type="password" placeholder="BOTTOLLBOOTH_TOKEN" autocomplete="off" style="flex:1">
+      <button id="refresh" class="ghost small">Refresh</button>
+    </div>
+    <label>Workspace (namespace)</label>
+    <div class="row" style="flex-wrap:nowrap">
+      <input id="namespace" type="text" placeholder="e.g. shop.example.com" style="flex:1">
+      <button id="create-ns" class="small">Create / select</button>
+    </div>
+    <div id="ns-list"></div>
+    <div class="row" style="margin-top:12px">
+      <button id="load-sample">Load sample traffic</button>
+      <button id="run-report" class="ghost">Run live report</button>
+      <button id="download" class="ghost small">Download JSON</button>
+      <span id="msg" class="msg" style="margin:0"></span>
+    </div>
+  </div>
+
+  <div id="report" class="hidden">
+    <h2>Live report — <span id="report-ns"></span></h2>
+    <div class="card">
+      <div id="mix" class="metrics"></div>
+      <div id="bars"></div>
+      <div class="row" style="justify-content:space-between;margin-top:10px;color:var(--muted);font-size:12px">
+        <span id="window"></span><span id="digest"></span>
+      </div>
+    </div>
+
+    <h2>Value exchange &amp; bandwidth</h2>
+    <div class="card" id="vegrap"></div>
+
+    <h2>Compliance pack</h2>
+    <div class="card">
+      <div id="optout-pills"></div>
+      <pre id="robots-txt" class="ready"></pre>
+      <pre id="disclosure"></pre>
+      <div class="row" style="margin-top:8px">
+        <button class="ghost small" data-copy="robots-txt">Copy robots.txt</button>
+        <button class="ghost small" data-copy="disclosure">Copy disclosure</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2 style="margin-top:0">Audit any URL (ethical, robots-respecting)</h2>
+    <div class="row" style="flex-wrap:nowrap">
+      <input id="audit-url" type="text" placeholder="https://some-site.example" style="flex:1">
+      <button id="audit">Audit</button>
+    </div>
+    <div id="audit-out"></div>
+  </div>
+
+  <div class="card">
+    <h2 style="margin-top:0">Classify a user agent</h2>
+    <div class="row" style="flex-wrap:nowrap">
+      <input id="ua-input" type="text" placeholder="Mozilla/5.0 (compatible; GPTBot/1.2; +https://openai.com/gptbot)" style="flex:1">
+      <button id="classify">Classify</button>
+    </div>
+    <div id="classify-out" style="margin-top:8px"></div>
+  </div>
+
+  <footer>
+    <a href="https://github.com/jweezy119/bottollbooth">github.com/jweezy119/bottollbooth</a> — open core, MIT. A workspace holds only aggregate counts; nothing ships anywhere else.
+  </footer>
+</div>
+
+<script>
+'use strict';
+(function () {
+  const $ = (id) => document.getElementById(id);
+  const ST = { token: '', ns: '', report: null };
+  const ok = (r) => { if (!r.ok) throw new Error((r.status) + ': ' + r.statusText); return r; };
+
+  try { ST.token = sessionStorage.getItem('btb-token') || ''; $('token').value = ST.token; } catch {}
+
+  function auth() { return ST.token ? { Authorization: 'Bearer ' + ST.token } : {}; }
+
+  async function api(path, opts) {
+    opts = opts || {};
+    opts.headers = Object.assign({ 'Content-Type': 'application/json' }, auth(), opts.headers || {});
+    const res = await fetch('/api/v1' + path, opts);
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || res.status);
+    return data;
+  }
+
+  const esc = (s) => String(s || '').replace(/[&<>"']/g, (c) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+  const pill = (v) => {
+    const map = { blocked: ['bad', 'blocked'], partial: ['warn', 'partial'], allowed: ['ok', 'allowed'] };
+    const m = map[v] || ['mut', 'unlisted'];
+    return `<span class="pill ${m[0]}">${m[1]}</span>`;
+  };
+
+  async function refresh() {
+    const data = await api('/namespaces');
+    const list = data.namespaces || [];
+    $('ns-list').innerHTML = list.map((n) =>
+      `<span class="chip${n === ST.ns ? ' active' : ''}" data-ns="${esc(n)}">${esc(n)}</span>`).join('') || '<div style="color:var(--muted);font-size:13px;margin-top:4px">No workspaces yet — pick a namespace and load sample traffic.</div>';
+    document.querySelectorAll('#ns-list .chip').forEach((c) => c.addEventListener('click', () => { ST.ns = c.dataset.ns; $('namespace').value = ST.ns; $('ns-list').querySelectorAll('.chip').forEach((x) => x.classList.toggle('active', x === c)); }));
+  }
+
+  const SAMPLE_UAS = [
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
+    'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.4 Mobile/15E148 Safari/604.1',
+    'Googlebot/2.1 (+http://www.google.com/bot.html)',
+    'Mozilla/5.0 (compatible; Bingbot/2.0; +http://www.bing.com/bingbot.htm)',
+    'GPTBot/1.2 (+https://openai.com/gptbot)',
+    'Mozilla/5.0 (compatible; ClaudeBot/1.0; +claudebot@anthropic.com)',
+    'CCBot/2.0 (https://commoncrawl.org/faq/)',
+    'PerplexityBot/1.0 (support@perplexity.ai)',
+    'Bytespider (spider-feedback@bytedance.com)',
+    'Amazonbot/0.1 (+https://developer.amazon.com/amazonbot)',
+    'Pingdom.com_bot_version_1.4 (http://www.pingdom.com/)',
+    'my-sample-bad-bot/1.0 (suspicious)',
+    'UptimeRobot/2.0 (+http://www.uptimerobot.com/)',
+    'PetalBot; (+https://aspiegel.com/petalbot)',
+    'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+  ];
+
+  const SAMPLE_ROWS = (function () {
+    const rows = [];
+    for (let i = 0; i < 240; i++) rows.push({ userAgent: 'Mozilla/5.0 human-ish ' + i, requestsPerMin: 2 });
+    for (const ua of SAMPLE_UAS) for (let k = 0; k < 8; k++) rows.push({ userAgent: ua, requestsPerMin: k === 0 ? 30 : 1 });
+    return rows;
+  })();
+
+  async function loadSample() {
+    if (!ST.ns) throw new Error('pick a namespace first');
+    const out = await api('/ingest', { method: 'POST', body: JSON.stringify({ namespace: ST.ns, rows: SAMPLE_ROWS }) });
+    return out;
+  }
+  window.APP = {
+    get state() { return ST; },
+    refresh, loadSample,
+    runReport: async () => {
+      if (!ST.ns) throw new Error('pick a namespace first');
+      const report = await api('/report?namespace=' + encodeURIComponent(ST.ns));
+      renderReport(report);
+      return report;
+    },
+    audit: async (url) => {
+      const a = await api('/audit', { method: 'POST', body: JSON.stringify({ url }) });
+      renderAudit(a);
+      return a;
+    },
+    classify: async (ua) => {
+      const c = await api('/classify?ua=' + encodeURIComponent(ua));
+      $('classify-out').innerHTML = `<span class="pill ${c.category === 'spam' ? 'bad' : 'ok'}">${esc(c.category)}</span> <span style="color:var(--muted);font-size:13px">conf ${c.confidence.toFixed(2)} · ${esc(c.signal || '')}</span>`;
+      return c;
+    },
+  };
+
+  function renderReport(rpt) {
+    ST.report = rpt;
+    $('report').classList.remove('hidden');
+    $('report-ns').textContent = ST.ns;
+    const s = rpt.summary || {};
+    $('mix').innerHTML = [
+      ['Total requests', s.total], ['Human', s.human], ['Bot', s.bot], ['Bot rate', s.total ? (s.botRate * 100).toFixed(1) + '%' : '0%'],
+    ].map(([l, v]) => `<div class="metric"><div class="v">${v}</div><div class="l">${l}</div></div>`).join('');
+    const order = ['human', 'ai-crawler', 'search-engine', 'monitoring', 'spam', 'unclassified'];
+    const c = s.byCategory || {};
+    $('bars').innerHTML = order.filter((k) => c[k]).map((k) => {
+      const pct = s.total ? Math.round((c[k] / s.total) * 100) : 0;
+      return `<div class="bar-row"><span>${k}</span><span class="bar ${k}"><i style="width:${pct}%"></i></span><span class="num">${pct}%</span></div>`;
+    }).join('');
+    $('window').textContent = (rpt.window && rpt.window.start) ? `window ${rpt.window.start} → ${rpt.window.end}` : '';
+    $('digest').textContent = 'digest ' + (rpt.digest || '');
+    const cr = Object.entries(rpt.crawlers || {}).sort((a, b) => b[1].requests - a[1].requests).slice(0, 8);
+    const rows = cr.map(([k, v]) => `<tr><td>${esc(v.label || k)}</td><td>${esc(v.purpose || '—')}</td><td class="num">${v.requests}</td><td style="color:var(--muted)">${esc(v.category || '')}</td></tr>`).join('');
+    const ve = (rpt.valueExchange || []).map((x) => `${x.label.replace(/^\d+\.\s*/, '')}: ${x.visitors}`).join(' · ') || 'no crawler rows yet';
+    const bw = rpt.bandwidth || {};
+    $('vegrap').innerHTML =
+      `<div style="font-size:13px;color:var(--muted);margin-bottom:6px">value exchange — ${esc(ve)}</div>` +
+      `<table><tr><th>Bandwidth</th><th class="num">bot</th><th class="num">training</th></tr>` +
+      `<tr><td>requests</td><td class="num">${bw.botRequests || 0}</td><td class="num">${bw.trainingRequests || 0}</td></tr>` +
+      `<tr><td>delivered</td><td class="num">${round2(bw.botMB)} MB / $${round2(bw.bandwidthCostUSD)}</td><td class="num">${round2(bw.trainingMB)} MB / $${round2(bw.trainingCostUSD)}</td></tr></table>` +
+      (rows ? `<table style="margin-top:12px"><tr><th>Crawler</th><th>Purpose</th><th class="num">Requests</th></tr>${rows}</table>` : '');
+  }
+  const round2 = (n) => Math.round((n || 0) * 100) / 100;
+
+  function renderAudit(a) {
+    const g = a.overall && a.overall.grade;
+    $('audit-out').innerHTML =
+      `<div class="row" style="margin-top:10px">
+        <div class="grade" style="background:${a.overall && a.overall.score >= 75 ? '#0e9f6e' : a.overall && a.overall.score >= 55 ? '#d98324' : '#d64545'}">${g || '?'}</div>
+        <div class="vcol">
+          <div style="font-weight:700">${esc(a.requested)} — ${a.reachable ? 'reachable' : 'not reachable'}</div>
+          <div style="color:var(--muted);font-size:13px">${a.overall ? a.overall.score + '/100' : ''} · ${a.tls ? 'HTTPS' : 'HTTP'}${a.auditedAt ? ' · ' + a.auditedAt.slice(0, 19).replace('T', ' ') : ''}</div>
+          <div style="font-size:13px">${esc(a.note || '')}</div>
+          <div>${(a.waf || []).concat(a.cdn || []).filter(Boolean).map((p) => '<span class="chip" style="margin:0 4px 0 0">' + esc(p) + '</span>').join('')}</div>
+        </div>
+      </div>` +
+      `<table style="margin-top:10px"><tr><th>AI crawler</th><th>robots verdict</th></tr>` +
+      Object.entries(a.robots.ai || {}).map(([t, v]) => `<tr><td>${esc(t)}</td><td>${pill(v)}</td></tr>`).join('') +
+      `</table><pre class="ready" style="margin-top:10px">${esc(a.compliance || '')}</pre>`;
+  }
+
+  function saveToken() { ST.token = $('token').value.trim(); try { sessionStorage.setItem('btb-token', ST.token); } catch {} }
+
+  function setMsg(m) { $('msg').textContent = m || ''; }
+  async function guard(fn) { try { const st = await fn(); setMsg('done'); return st; } catch (e) { $('msg').textContent = '⚠ ' + e.message; return null; } }
+
+  $('token').addEventListener('change', saveToken);
+  $('create-ns').addEventListener('click', () => { saveToken(); const v = $('namespace').value.trim().toLowerCase(); if (!v) return setMsg('namespace required'); ST.ns = v; setMsg('workspace ' + v); refresh(); });
+  $('refresh').addEventListener('click', () => { saveToken(); refresh().then(() => setMsg('refreshed')).catch((e) => setMsg('⚠ ' + e.message)); });
+  $('load-sample').addEventListener('click', () => guard(loadSample).then((o) => { if (o) setMsg('ingested ' + o.accepted + ' rows'); }));
+  $('run-report').addEventListener('click', () => guard(APP.runReport));
+  $('download').addEventListener('click', () => {
+    if (!ST.report) return setMsg('run a report first');
+    const a = document.createElement('a');
+    a.href = 'data:application/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(ST.report, null, 2));
+    a.download = 'bottollbooth-' + ST.ns + '.json';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  });
+  $('audit').addEventListener('click', () => { saveToken(); const u = $('audit-url').value.trim(); u ? guard(() => APP.audit(u)) : setMsg('enter a URL'); });
+  $('classify').addEventListener('click', () => { saveToken(); const ua = $('ua-input').value.trim(); ua ? guard(() => APP.classify(ua)) : setMsg('enter a UA'); });
+  document.querySelectorAll('[data-copy]').forEach((b) => b.addEventListener('click', async () => {
+    try { await navigator.clipboard.writeText($(b.dataset.copy).textContent); b.textContent = 'Copied'; } catch {}
+    setTimeout(() => { b.textContent = b.dataset.copy.replace('-', ' '); }, 1200);
+  }));
+
+  refresh().then(() => { if (ST.ns) $('namespace').value = ST.ns; }).catch(() => {});
+})();
+</script>
+</body>
+</html>

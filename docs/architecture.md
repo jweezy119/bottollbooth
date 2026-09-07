@@ -193,6 +193,21 @@ computation (moved out of the CLI so library users can reuse it).
 `bt.compliance`, mirroring the service report shape — the demo and CLI use
 the same pure functions, only inlined.
 
+## Workspace dashboard + persistence
+
+`app.html` (`GET /app`) is the hosted **workspace** UI that turns the service
+into a self-serve app: create a namespace, load sample traffic or pump real
+rows through `/api/v1/ingest`, read the live report (mix, value exchange,
+bandwidth, compliance pack + digest), audit any URL, and export JSON. It is a
+single static page with a CSP — the same zero-dependency religion.
+
+`src/service/store.js` gives the service restart persistence without a
+database: one JSON file per namespace (classified request entries) plus a
+shared `audits.json` (host → latest audit). Writes are atomic (tmp + rename),
+namespaces are sanitised to `[a-z0-9._-]` (no path traversal), and in-memory
+buckets are re-seeded from `DATA_DIR` at boot via `ingest.seed()`.
+`GET /api/v1/namespaces` lists workspaces for the dashboard.
+
 ## External site audit (`src/audit/`)
 
 The no-logs path: an owner hands you a competitor's (or their own) URL and

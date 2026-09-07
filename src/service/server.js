@@ -29,7 +29,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const http = require('node:http');
-const { ingest, aggregate, reportDigest } = require('./ingest.js');
+const { ingest, aggregate, reportDigest, seed, listNamespaces } = require('./ingest.js');
 const {
   classify,
   robotTxt,
@@ -37,6 +37,7 @@ const {
   ntmDisclosure,
 } = require('../engine/index.js');
 const { runAudit, AuditError } = require('../audit/index.js');
+const store = require('./store.js');
 
 const PORT = Number(process.env.PORT) || 8080;
 const DEFAULT_RPM = Number(process.env.DEFAULT_RPM) || 15;
@@ -45,6 +46,12 @@ const AUDIT_INTERVAL_MS = Number(process.env.AUDIT_INTERVAL_MS) || 5000;
 
 const PROBE_JS = fs.readFileSync(path.join(__dirname, '../probe/probe.js'), 'utf8');
 const AUDIT_HTML = fs.readFileSync(path.join(__dirname, '../../audit.html'), 'utf8');
+const APP_HTML = fs.readFileSync(path.join(__dirname, '../../app.html'), 'utf8');
+
+store.init(process.env.DATA_DIR || path.join(__dirname, '../../data/service'));
+for (const [ns, entries] of store.loadAll()) {
+  seed(ns, entries);
+}
 
 const lastAuditAt = new Map(); // host → timestamp (per-host throttle)
 
@@ -111,6 +118,12 @@ const server = http.createServer(async (req, res) => {
       return res.end(AUDIT_HTML);
     }
 
+    // GET /app — hosted dashboard (workspaces + live reports), always open
+    if (req.method === 'GET' && url.pathname === '/app') {
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
+      return res.end(APP_HTML);
+    }
+
     // GET /health — liveness, always open
     if (req.method === 'GET' && url.pathname === '/health') {
       return send(res, 200, { status: 'ok' });
@@ -127,8 +140,15 @@ const server = http.createServer(async (req, res) => {
       if (!payload.namespace || !Array.isArray(payload.rows)) {
         return send(res, 400, { error: 'body must be { namespace: string, rows: [] }' });
       }
-      const out = ingest(payload.namespace, payload.rows);
+      const ns = payload.namespace.toLowerCase();
+      try { store.sanitize(ns); } catch (err) { return send(res, 422, { error: 'invalid_namespace' }); }
+      const out = ingest(ns, payload.rows, (entries) => store.persist(ns, entries));
       return send(res, 201, { ok: true, ...out });
+    }
+
+    // GET /api/v1/namespaces — list persistent workspaces + stored audits
+    if (req.method === 'GET' && url.pathname === '/api/v1/namespaces') {
+      return send(res, 200, { namespaces: listNamespaces(), audits: store.listAudits() });
     }
 
     // POST /api/v1/probe  { namespace, userAgent, signals?: {...} }
@@ -138,7 +158,9 @@ const server = http.createServer(async (req, res) => {
         return send(res, 400, { error: 'body must be { namespace: string, userAgent: string, signals?: {webdriver?, softwareRenderer?, pluginsCount?} }' });
       }
       const row = Object.assign({ userAgent: payload.userAgent, requestsPerMin: 1 }, payload.signals || {});
-      const out = ingest(payload.namespace, [row]);
+      const ns = payload.namespace.toLowerCase();
+      try { store.sanitize(ns); } catch (err) { return send(res, 422, { error: 'invalid_namespace' }); }
+      const out = ingest(ns, [row], (entries) => store.persist(ns, entries));
       return send(res, 201, { ok: true, accepted: out.accepted });
     }
 
@@ -199,6 +221,7 @@ const server = http.createServer(async (req, res) => {
       try {
         const audit = await runAudit(payload.url, { timeoutMs: 8000 });
         lastAuditAt.set(host, Date.now());
+        store.saveAudit(audit.host, audit);
         return send(res, 200, audit);
       } catch (err) {
         if (err instanceof AuditError) return send(res, 422, { error: err.code, message: err.message });
@@ -220,8 +243,10 @@ server.listen(PORT, () => {
   console.log(`  GET  /api/v1/report?namespace=<site>&rpm=15`);
   console.log(`  GET  /api/v1/compliance?namespace=<site>`);
   console.log(`  GET  /api/v1/classify?ua=<user-agent>`);
+  console.log(`  GET  /api/v1/namespaces`);
   console.log(`  GET  /probe.js`);
   console.log(`  GET  /audit`);
+  console.log(`  GET  /app`);
   console.log(`  GET  /health`);
 });
 

@@ -5,6 +5,10 @@ services:
     container_name: bottollbooth
     environment:
       PORT: 8080
+      # BOTTOLLBOOTH_TOKEN: set this to require a Bearer token on /api/v1/*
+      DATA_DIR: /app/data
+    volumes:
+      - ./data/service:/app/data
     ports:
       - "8080:8080"
     restart: unless-stopped

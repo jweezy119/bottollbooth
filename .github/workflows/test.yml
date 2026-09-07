@@ -47,6 +47,20 @@ jobs:
           if [ "$code" != "400" ]; then echo "expected 400 missing url, got $code"; exit 1; fi
           curl -s -X POST "http://localhost:8080/api/v1/audit" -H "Content-Type: application/json" -d '{"url":"http://127.0.0.1/x"}' | grep -q 'blocked_ssrf'
           curl -fsS http://localhost:8080/audit | grep -q 'Run audit'
+          curl -fsS http://localhost:8080/app | grep -q 'Load sample traffic'
+          curl -fsS "http://localhost:8080/api/v1/namespaces" | grep -q '"namespaces":'
+          kill $API_PID
+      - name: Verify workspace persistence across a service restart
+        run: |
+          export DATA_DIR=/tmp/btb-persist
+          node src/service/server.js & API_PID=$!
+          sleep 2
+          curl -fsS -X POST "http://localhost:8080/api/v1/ingest" -H "Content-Type: application/json" -d '{"namespace":"persist.example.com","rows":[{"userAgent":"GPTBot/1.2 (+https://openai.com/gptbot)"}]}' >/dev/null
+          kill $API_PID
+          sleep 1
+          node src/service/server.js & API_PID=$!
+          sleep 2
+          curl -fsS "http://localhost:8080/api/v1/report?namespace=persist.example.com" | grep -q '"ai-crawler":1'
           kill $API_PID
       - name: Verify token-gated API
         run: |

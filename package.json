@@ -10,7 +10,7 @@
   "private": true,
   "license": "MIT",
   "scripts": {
-    "test": "node test/engine.test.js && node test/logparse.test.js && node test/audit.test.js && node test/sdk.test.js && node test/demo.test.js && node test/service.test.js",
+    "test": "node test/engine.test.js && node test/logparse.test.js && node test/audit.test.js && node test/store.test.js && node test/sdk.test.js && node test/demo.test.js && node test/app.test.js && node test/service.test.js",
     "demo": "node examples/demo.js",
     "start": "node src/service/server.js"
   },

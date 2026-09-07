@@ -32,9 +32,10 @@ const buckets = new Map();
  * Accept a batch of raw request rows and record only their classifications.
  * @param {string} namespace - the site/customer namespace (e.g. store domain)
  * @param {Array<{userAgent?:string, behaviourScore?:number, requestsPerMin?:number}>} rows
+ * @param {Function} [onUpdate] - called with the full entries array after each change
  * @returns {{received:number, accepted:number}}
  */
-function ingest(namespace, rows) {
+function ingest(namespace, rows, onUpdate) {
   if (!namespace || typeof namespace !== 'string') {
     throw new TypeError('ingest: a string `namespace` is required');
   }
@@ -56,7 +57,19 @@ function ingest(namespace, rows) {
   }
   if (entries.length > 200_000) entries.splice(0, entries.length - 200_000);
   buckets.set(namespace, entries);
+  if (typeof onUpdate === 'function') onUpdate(entries);
   return { received: rows.length, accepted };
+}
+
+/** Seed a namespace's entries at boot (used by the persistence layer). */
+function seed(namespace, entries) {
+  if (!namespace || typeof namespace !== 'string') throw new TypeError('seed: namespace required');
+  buckets.set(namespace, Array.isArray(entries) ? entries : []);
+}
+
+/** Namespaces that currently have data. */
+function listNamespaces() {
+  return [...buckets.keys()];
 }
 
 function canonical(obj) {
@@ -140,4 +153,4 @@ function aggregate(namespace, rpm, fillScale = 50, opts = {}) {
   return { ...report, digest: reportDigest(report) };
 }
 
-module.exports = { ingest, aggregate, reportDigest };
+module.exports = { ingest, aggregate, reportDigest, seed, listNamespaces };

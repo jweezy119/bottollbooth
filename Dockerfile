@@ -9,6 +9,10 @@ WORKDIR /app
 COPY package.json ./
 COPY --chown=node:node src ./src
 COPY --chown=node:node audit.html ./audit.html
+COPY --chown=node:node app.html ./app.html
+
+# Persistent workspace store (JSON files); writable by the non-root user.
+RUN mkdir -p /app/data && chown node:node /app/data
 
 # Run as the unprivileged node user, never as root.
 USER node
