@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BotTollbooth — Live Demo</title>
+<style>
+  :root {
+    --bg: #0f1117; --surface: #161921; --border: #252830;
+    --text: #e2e4e9; --muted: #7c8190; --accent: #6c5ce7;
+    --accent-text: #fff; --green: #00b894; --red: #e17055;
+    --yellow: #fdcb6e; --blue: #74b9ff; --orange: #f38030;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: var(--bg); color: var(--text); font-family: 'Inter', -apple-system, system-ui, sans-serif; padding: 24px; line-height: 1.5; }
+  h1 { font-size: 1.6em; margin-bottom: 4px; }
+  .subtitle { color: var(--muted); font-size: 0.9em; margin-bottom: 20px; }
+  .subtitle a { color: var(--accent); text-decoration: none; }
+  .subtitle a:hover { text-decoration: underline; }
+
+  .controls { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 20px; align-items: center; }
+  .controls label { color: var(--muted); font-size: 0.82em; }
+  .controls select, .controls input[type="range"] { background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 6px 10px; font-size: 0.85em; }
+  .controls input[type="range"] { width: 120px; accent-color: var(--accent); }
+  .controls .period-btn {
+    padding: 6px 14px; border-radius: 6px; border: 1px solid var(--border);
+    background: var(--surface); color: var(--muted); cursor: pointer; font-size: 0.82em; transition: all 0.15s;
+  }
+  .controls .period-btn.active { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
+
+  .metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-bottom: 20px; }
+  .metric-card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 16px;
+  }
+  .metric-card .value { font-size: 1.8em; font-weight: 700; margin: 0; }
+  .metric-card .label { font-size: 0.78em; color: var(--muted); margin-top: 2px; }
+  .metric-card.green .value { color: var(--green); }
+  .metric-card.red .value { color: var(--red); }
+  .metric-card.yellow .value { color: var(--yellow); }
+  .metric-card.blue .value { color: var(--blue); }
+
+  .section-title { font-size: 1.05em; font-weight: 600; margin: 24px 0 12px; }
+
+  .category-table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+  .category-table th { text-align: left; color: var(--muted); font-size: 0.78em; font-weight: 500; padding: 6px 10px; border-bottom: 1px solid var(--border); }
+  .category-table td { padding: 8px 10px; border-bottom: 1px solid var(--border); font-size: 0.9em; }
+  .category-table tr:last-child td { border-bottom: none; }
+  .pill { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 0.74em; font-weight: 600; }
+  .pill.human { background: rgba(0,184,148,0.15); color: var(--green); }
+  .pill.ai-crawler { background: rgba(108,92,231,0.15); color: var(--accent); }
+  .pill.search-engine { background: rgba(116,185,255,0.15); color: var(--blue); }
+  .pill.spam { background: rgba(225,112,85,0.15); color: var(--red); }
+  .pill.monitoring { background: rgba(253,203,110,0.15); color: var(--yellow); }
+  .pill.unclassified { background: rgba(124,129,144,0.15); color: var(--muted); }
+
+  .bar-row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+  .bar-label { width: 120px; font-size: 0.82em; color: var(--muted); text-align: right; }
+  .bar-track { flex: 1; height: 18px; background: var(--surface); border-radius: 4px; overflow: hidden; }
+  .bar-fill { height: 100%; border-radius: 4px; transition: width 0.4s ease; }
+  .bar-fill.human { background: var(--green); }
+  .bar-fill.ai-crawler { background: var(--accent); }
+  .bar-fill.search-engine { background: var(--blue); }
+  .bar-fill.spam { background: var(--red); }
+  .bar-fill.monitoring { background: var(--yellow); }
+  .bar-fill.unclassified { background: var(--muted); }
+  .bar-count { width: 40px; font-size: 0.82em; font-weight: 600; }
+
+  .request-log { max-height: 300px; overflow-y: auto; font-family: 'JetBrains Mono', 'Fira Code', monospace; font-size: 0.78em; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 10px; }
+  .request-log .row { display: flex; gap: 8px; padding: 3px 0; border-bottom: 1px solid rgba(255,255,255,0.03); }
+  .request-log .row:last-child { border-bottom: none; }
+  .request-log .ua { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); }
+  .request-log .cat { width: 110px; text-align: right; }
+  .request-log .conf { width: 50px; text-align: right; color: var(--muted); }
+
+  .cta-box { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 20px; text-align: center; margin-top: 24px; }
+  .cta-box p { color: var(--muted); font-size: 0.9em; margin-bottom: 12px; }
+  .cta-btn {
+    display: inline-block; padding: 10px 24px; border-radius: 8px; border: none;
+    background: var(--orange); color: #fff; font-weight: 700; font-size: 0.95em;
+    text-decoration: none; transition: transform 0.15s;
+  }
+  .cta-btn:hover { transform: scale(1.04); }
+
+  .footer { text-align: center; color: var(--muted); font-size: 0.72em; margin-top: 30px; }
+  .footer a { color: var(--accent); text-decoration: none; }
+</style>
+</head>
+<body>
+
+<h1>🤖 Bot Traffic Impact Dashboard</h1>
+<p class="subtitle">Live demo of the <a href="https://github.com/jweezy119/bottollbooth">BotTollbooth</a> classification engine — run entirely in your browser, zero server required.</p>
+
+<div class="controls">
+  <label>Period:</label>
+  <button class="period-btn active" data-p="7d">7d</button>
+  <button class="period-btn" data-p="30d">30d</button>
+  <button class="period-btn" data-p="90d">90d</button>
+  <button class="period-btn" data-p="365d">365d</button>
+  <label style="margin-left:20px">RPM ($/1k views):</label>
+  <input type="range" id="rpm" min="2" max="50" value="15" step="1">
+  <span id="rpm-val" style="font-size:0.85em;min-width:30px">$15</span>
+  <label style="margin-left:10px">Samples:</label>
+  <input type="range" id="count" min="50" max="5000" value="2000" step="50">
+  <span id="count-val" style="font-size:0.85em;min-width:45px">2000</span>
+  <button id="rerun" style="margin-left:10px;padding:6px 14px;border-radius:6px;border:1px solid var(--accent);background:var(--accent);color:#fff;cursor:pointer;font-weight:600;font-size:0.82em">Regenerate</button>
+</div>
+
+<div class="metrics" id="metrics"></div>
+
+<div class="section-title">Traffic by Category</div>
+<div id="bars"></div>
+
+<div class="section-title">Category Breakdown</div>
+<table class="category-table" id="cat-table">
+  <thead><tr><th>Category</th><th>Count</th><th>Rate</th><th>Classification</th></tr></thead>
+  <tbody id="cat-tbody"></tbody>
+</table>
+
+<div class="section-title">Last 20 Classified Requests</div>
+<div class="request-log" id="log"></div>
+
+<div class="cta-box">
+  <p>Seeing real bot traffic on your own site? <strong>Cloudflare Pro</strong> filters this automatically — <strong>$20/mo</strong> for a 66% human rate.</p>
+  <a class="cta-btn" href="https://www.cloudflare.com/pricing/" target="_blank" rel="noreferrer">Protect Traffic with Cloudflare →</a>
+</div>
+
+<p class="footer">BotTollbooth v1.0 — <a href="https://github.com/jweezy119/bottollbooth">GitHub</a> · MIT License · Syed Jawad Hussain</p>
+
+<script>
+// ---- ENGINE (inlined from src/host/engine.js) ----
+var UA_RULES=[
+  {c:'ai-crawler',p:/\bGPTBot\b/i},{c:'ai-crawler',p:/\bChatGPT-User\b/i},
+  {c:'ai-crawler',p:/\bClaudeBot\b/i},{c:'ai-crawler',p:/\bAnthropic-AI\b/i},
+  {c:'ai-crawler',p:/\bGoogle-Extended\b/i},{c:'ai-crawler',p:/\bCCBot\b/i},
+  {c:'ai-crawler',p:/\bPerplexityBot\b/i},{c:'ai-crawler',p:/\bcohere-ai\b/i},
+  {c:'search-engine',p:/\bGooglebot\b/i},{c:'search-engine',p:/\bingbot\b/i},
+  {c:'search-engine',p:/\bDuckDuckBot\b/i},{c:'search-engine',p:/\bYandexBot\b/i},
+  {c:'search-engine',p:/\bBaiduspider\b/i},
+  {c:'monitoring',p:/\bUptimeRobot\b/i},{c:'monitoring',p:/\bStatusCake\b/i},
+  {c:'monitoring',p:/\bPingdom\b/i},
+  {c:'spam',p:/\bSemrushBot\b/i},{c:'spam',p:/\bAhrefsBot\b/i},
+  {c:'spam',p:/\bMJ12bot\b/i},{c:'spam',p:/\bcurl\/\b/i},
+  {c:'spam',p:/\bpython-requests\b/i},{c:'spam',p:/\bwget\/\b/i},
+];
+var BH={noJs:3,noCookies:1,headless:4,burst:3,zeroDwell:2,singlePage:1};
+
+function classify(r){
+  var ua=r.userAgent||'';
+  for(var i=0;i<UA_RULES.length;i++){
+    if(UA_RULES[i].p.test(ua))return{category:UA_RULES[i].c,confidence:0.92,signal:'ua:'+UA_RULES[i].c};
+  }
+  var b=r.behaviourScore||0,rps=r.requestsPerMin||0;
+  if(!ua||ua.length<12)return{category:'unclassified',confidence:0.4,signal:'ua:empty'};
+  if(b>=BH.zeroDwell+BH.singlePage+BH.headless)return{category:'spam',confidence:0.85,signal:'behav:high'};
+  if(rps>60)return{category:'spam',confidence:0.78,signal:'rate:burst'};
+  return{category:'human',confidence:0.9,signal:'behav:human'};
+}
+
+function summarize(rows){
+  var by={human:0,'ai-crawler':0,'search-engine':0,spam:0,monitoring:0,unclassified:0};
+  for(var i=0;i<rows.length;i++){var c=classify(rows[i]).category;by[c]=(by[c]||0)+1;}
+  var total=rows.length,human=by.human,bot=total-human;
+  return{total:total,human:human,bot:bot,byCategory:by,botRate:total?bot/total:0};
+}
+
+function revenueImpact(s,rpm){return{monthlyVisitors:s.total,botVisitors:s.bot,botRate:s.botRate,recoveredMonthly:(s.bot/1000)*rpm*0.5};}
+
+// ---- SAMPLE GENERATOR ----
+var HUMAN_UAS=[
+  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
+  'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Safari/605.1.15',
+  'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1',
+  'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Mobile Safari/537.36',
+  'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:127.0) Gecko/20100101 Firefox/127.0',
+  'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:127.0) Gecko/20100101 Firefox/127.0',
+  'Mozilla/5.0 (iPad; CPU OS 17_5_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1',
+  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36 Edg/125.0.0.0',
+];
+var BOT_UAS=[
+  {ua:'GPTBot/1.0 (+https://openai.com/gptbot)',w:8},
+  {ua:'ChatGPT-User/1.0 (+https://openai.com/bot)',w:5},
+  {ua:'ClaudeBot/1.0 (+https://anthropic.com/claude-bot)',w:7},
+  {ua:'Google-Extended/1.0',w:6},
+  {ua:'CCBot/2.0 (https://commoncrawl.org/faq/)',w:10},
+  {ua:'PerplexityBot/1.0 (+https://perplexity.ai/bot)',w:3},
+  {ua:'cohere-ai (+https://cohere.com/bot)',w:2},
+  {ua:'Googlebot/2.1 (+http://www.google.com/bot.html)',w:12},
+  {ua:'Mozilla/5.0 (compatible; bingbot/2.0; +http://www.bing.com/bingbot.htm)',w:8},
+  {ua:'DuckDuckBot/1.0 (+https://duckduckgo.com/duckduckbot.html)',w:4},
+  {ua:'Mozilla/5.0 (compatible; YandexBot/3.0; +http://yandex.com/bots)',w:5},
+  {ua:'UptimeRobot/2.0',w:1},
+  {ua:'StatusCakeBot/1.0',w:1},
+  {ua:'python-requests/2.32.3',w:3},
+  {ua:'curl/8.5.0',w:2},
+  {ua:'wget/1.21.4',w:1},
+  {ua:'SemrushBot/7~bl',w:4},
+  {ua:'AhrefsBot/7.0',w:3},
+];
+var EMPTY_UAS=['','',''];
+
+function pickWeighted(items){var total=0;for(var i=0;i<items.length;i++)total+=items[i].w;var r=Math.random()*total;for(var i=0;i<items.length;i++){r-=items[i].w;if(r<=0)return items[i].ua;}return items[items.length-1].ua;}
+
+function generate(n){
+  var rows=[];
+  for(var i=0;i<n;i++){
+    var r=Math.random();
+    if(r<0.55)rows.push({userAgent:HUMAN_UAS[Math.floor(Math.random()*HUMAN_UAS.length)],dwellMs:5000+Math.random()*120000});
+    else if(r<0.92)rows.push({userAgent:pickWeighted(BOT_UAS),requestsPerMin:Math.random()>0.8?5+Math.random()*80:0});
+    else rows.push({userAgent:EMPTY_UAS[Math.floor(Math.random()*EMPTY_UAS.length)],behaviourScore:Math.random()*8});
+  }
+  return rows;
+}
+
+// ---- RENDER ----
+var STATE={period:'30d',rpm:15,count:2000,rows:[]};
+
+function render(){
+  STATE.rows=generate(STATE.count);
+  var s=summarize(STATE.rows);
+  var imp=revenueImpact(s,STATE.rpm);
+
+  document.getElementById('metrics').innerHTML=
+    card(Math.round(s.botRate*100)+'%','Bot Rate','red')+
+    card(Math.round((1-s.botRate)*100)+'%','Human Rate','green')+
+    card('$'+imp.recoveredMonthly.toFixed(2),'Recoverable/mo','yellow')+
+    card(s.total.toLocaleString(),'Sampled Visits','blue')+
+    card('$'+STATE.rpm,'Publisher RPM','')+
+    card('$'+(s.human*STATE.rpm/1000).toFixed(2),'Actual Rev/mo','green');
+
+  var maxCount=Math.max.apply(null,Object.values(s.byCategory).map(Number));
+  var barsHtml='';
+  var cats=['human','ai-crawler','search-engine','spam','monitoring','unclassified'];
+  var catLabels={'human':'Human','ai-crawler':'AI Crawler','search-engine':'Search Engine','spam':'Spam/Scraper','monitoring':'Monitoring','unclassified':'Unclassified'};
+  for(var i=0;i<cats.length;i++){
+    var c=cats[i],n=s.byCategory[c]||0;
+    var pct=maxCount?Math.round(n/maxCount*100):0;
+    barsHtml+='<div class="bar-row"><span class="bar-label">'+catLabels[c]+'</span><div class="bar-track"><div class="bar-fill '+c+'" style="width:'+pct+'%"></div></div><span class="bar-count">'+n+'</span></div>';
+  }
+  document.getElementById('bars').innerHTML=barsHtml;
+
+  var tbody='';
+  for(var i=0;i<cats.length;i++){
+    var c=cats[i],n=s.byCategory[c]||0;
+    var rate=s.total?Math.round(n/s.total*1000)/10:0;
+    tbody+='<tr><td><span class="pill '+c+'">'+catLabels[c]+'</span></td><td>'+n+'</td><td>'+rate+'%</td><td>'+describeClass(c)+'</td></tr>';
+  }
+  document.getElementById('cat-tbody').innerHTML=tbody;
+
+  var logHtml='';
+  var last20=STATE.rows.slice(-20).reverse();
+  for(var i=0;i<last20.length;i++){
+    var cl=classify(last20[i]);
+    var uaDisplay=(last20[i].userAgent||'(empty)').substring(0,60);
+    logHtml+='<div class="row"><span class="cat"><span class="pill '+cl.category+'">'+cl.category+'</span></span><span class="conf">'+Math.round(cl.confidence*100)+'%</span><span class="ua">'+esc(uaDisplay)+'</span></div>';
+  }
+  document.getElementById('log').innerHTML=logHtml;
+}
+
+function card(val,label,cls){return '<div class="metric-card'+(cls?' '+cls:'')+'"><p class="value">'+val+'</p><p class="label">'+label+'</p></div>';}
+function describeClass(c){
+  var m={'human':'Real browser, heuristic-verified','ai-crawler':'LLM training/inference crawler (GPTBot, ClaudeBot, etc.)','search-engine':'Organic search bot (Googlebot, bingbot, etc.)','spam':'Disposable scraper or abuser agent','monitoring':'Uptime/status monitor','unclassified':'Empty or ambiguous user-agent'};
+  return m[c]||c;
+}
+function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+
+// ---- CONTROLS ----
+document.getElementById('rpm').addEventListener('input',function(e){STATE.rpm=+e.target.value;document.getElementById('rpm-val').textContent='$'+STATE.rpm;render();});
+document.getElementById('count').addEventListener('input',function(e){STATE.count=+e.target.value;document.getElementById('count-val').textContent=STATE.count;});
+document.getElementById('rerun').addEventListener('click',render);
+document.querySelectorAll('.period-btn').forEach(function(btn){
+  btn.addEventListener('click',function(){
+    document.querySelectorAll('.period-btn').forEach(function(b){b.classList.remove('active');});
+    btn.classList.add('active');
+    STATE.period=btn.dataset.p;
+    render();
+  });
+});
+
+// Initial render
+render();
+</script>
+</body>
+</html>
