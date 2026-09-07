@@ -1,17 +1,11 @@
-# Keep the build context tiny — the image only needs src/ + package.json.
 .git
-node_modules
+.gitignore
 .github
+node_modules
+data
 docs
-examples
 test
-index.html
+examples
 *.log
 .env
 .env.*
-!.env.example
-README.md
-LICENSE
-Dockerfile
-docker-compose.yml
-.dockerignore

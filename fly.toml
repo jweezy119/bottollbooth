@@ -1,0 +1,43 @@
+# Fly.io frugal config: one 256MB shared-cpu machine that scales to zero when idle.
+# Costs roughly $2-5/month on Pay-As-You-Go (no free tier for new 2026 accounts),
+# near $0 compute with auto_stop while the 1GB volume keeps data warm.
+
+app = "bottollbooth"
+primary_region = "iad"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  PORT = "8080"
+  DATA_DIR = "/data"
+
+# 256MB shared CPU is the cheapest machine.
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "256mb"
+
+# 1GB persistent volume for the JSON workspace store. Created with:
+#   fly volumes create btb_data --region iad --size 1
+[[mounts]]
+  source = "btb_data"
+  destination = "/data"
+  initial_size = "1gb"
+
+[[http_service]]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = true
+  auto_start_machines = true
+  min_machines_running = 0
+
+  [http_service.concurrency]
+    hard_limit = 50
+    soft_limit = 10
+
+  [[http_service.checks]]
+    interval = "30s"
+    timeout = "3s"
+    grace_period = "10s"
+    path = "/health"
+    method = "GET"

@@ -133,13 +133,36 @@ docker run -d --name bottollbooth -p 8080:8080 bottollbooth   # or: docker compo
 curl http://localhost:8080/health   # {"status":"ok"}
 ```
 
-The container is a Node 22 Alpine image, runs as a non-root user, and carries
-a healthcheck. Set `BOTTOLLBOOTH_TOKEN` to require
+The container is a Node 22 Alpine image; the app process runs as a non-root
+user (the entrypoint drops from root to the unprivileged `node` user after
+making `DATA_DIR` writable), and carries a healthcheck. Set
+`BOTTOLLBOOTH_TOKEN` to require
 `Authorization: Bearer <token>` on every `/api/v1/*` endpoint (write and read
 alike); `/health` and `/probe.js` stay open. Security headers (nosniff,
 frame-deny, referrer policy) are applied to every response.
 The dashboard is a static file (`index.html`) — it calls the same engine
 in-browser with a CSP, so nothing else is needed to explore.
+
+### Deploy to Fly.io (the frugal path)
+
+[`fly.toml`](fly.toml) is ready for a single 256MB shared-CPU machine that
+auto-stops when idle (scale-to-zero) so compute is near-free between visits,
+with a 1GB volume keeping workspaces warm across restarts. Honest cost check
+(2026): Fly has no free tier for new accounts — Pay-As-You-Go only, roughly
+**$2/mo** if the machine never stops, **often under $1** with auto-stop, plus a
+1GB volume at ~$0.15/mo and a few cents of egress.
+
+```bash
+flyctl auth login                     # browser login, first time only
+flyctl launch --name bottollbooth --region iad --no-deploy   # creates the app
+flyctl volumes create btb_data --region iad --size 1          # the 1GB store
+flyctl secrets set BOTTOLLBOOTH_TOKEN=change-me-long-random   # gate the API
+flyctl deploy
+flyctl open                           # https://bottollbooth.fly.dev/app
+```
+
+`flyctl destroy` also deletes the app (and stops billing) when you're done.
+If the name `bottollbooth` is taken, pick another in `flyctl launch --name`.
 
 ## HTTP API
 
@@ -253,8 +276,9 @@ user-adjustable). SMB owners get a defensible number instead of a scare.
 
 ## Roadmap (what's next)
 
-- **Deploy the app somewhere real** — pick a host for the service + dashboard
-  (Fly.io / Railway / Render) and add a one-click launch button to this README.
+- **Deploy the app somewhere real** — the service + dashboard are deployed on
+  a host; see the Fly.io path above (or a one-click button for a friendlier
+  option).
 - **Signed, anchorable reports** — SAS-verified digests so a report can be
   notarized over time (strategy Tier 1).
 - **Crawler/agent identity registry** — credentialed identities for the
