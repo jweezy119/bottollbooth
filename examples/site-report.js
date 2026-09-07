@@ -36,7 +36,7 @@ function parseArgs() {
     const i = args.indexOf(k);
     return i >= 0 ? args[i + 1] : undefined;
   };
-  const VALUED = new Set(['--namespace', '--rpm', '--fill-scale', '--write-dir']);
+  const VALUED = new Set(['--namespace', '--rpm', '--fill-scale', '--write-dir', '--page-kb', '--cost-per-gb']);
   const positional = [];
   for (let i = 0; i < args.length; i++) {
     const a = args[i];
@@ -51,6 +51,8 @@ function parseArgs() {
     namespace: opt('--namespace') || 'site',
     rpm: Number(opt('--rpm') || 15),
     fillScale: Number(opt('--fill-scale') || 50),
+    pageSizeKB: Number(opt('--page-kb') || 2500),
+    costPerGB: Number(opt('--cost-per-gb') || 0.09),
     writeDir: opt('--write-dir'),
   };
 }
@@ -62,7 +64,7 @@ const PURPOSE_COPY = {
   mixed: 'Mixed purpose (vendor uses content for several things)',
 };
 
-function buildReport(file, { namespace = 'site', rpm = 15, fillScale = 50 } = {}) {
+function buildReport(file, { namespace = 'site', rpm = 15, fillScale = 50, pageSizeKB = 2500, costPerGB = 0.09 } = {}) {
   const text = fs.readFileSync(file, 'utf8');
   const { rows } = rowsFromLog(text);
   const ts = text
@@ -74,7 +76,7 @@ function buildReport(file, { namespace = 'site', rpm = 15, fillScale = 50 } = {}
   const span = ts.length ? ((ts[ts.length - 1] - ts[0]) / 1000).toFixed(0) : '-';
 
   ingest(namespace, rows);
-  const report = aggregate(namespace, rpm, fillScale);
+  const report = aggregate(namespace, rpm, fillScale, { pageSizeKB, costPerGB });
 
   const vx = report.valueExchange;
   const ratio = vx.pagesPerReferral
@@ -125,6 +127,15 @@ function buildReport(file, { namespace = 'site', rpm = 15, fillScale = 50 } = {}
   disclosure.json.digest = reportDigest(disclosure.json);
   lines.push(`  disclosure digest: sha256 ${disclosure.json.digest}`);
   lines.push('');
+  const bw = report.bandwidth;
+  lines.push('5. Bandwidth & cost impact');
+  lines.push('-------------------------');
+  lines.push(`  bot requests served:      ${bw.botRequests} (${bw.botMB.toFixed(1)} MB delivered)`);
+  lines.push(`  estimated egress cost:     $${bw.bandwidthCostUSD.toFixed(4)}`);
+  lines.push(`  training crawler traffic:  ${bw.trainingRequests} requests (${bw.trainingMB.toFixed(1)} MB)`);
+  lines.push(`  training cost (egress):    $${bw.trainingCostUSD.toFixed(4)}`);
+  for (const a of bw.assumptions) lines.push(`    - ${a}`);
+  lines.push('');
   lines.push(`digest: sha256 ${report.digest}`);
   return { text: lines.join('\n'), report, compliance: { robotsTxt: robotTxt(report.crawlers, { namespace }), optOuts: optOutList(report.crawlers), disclosure } };
 }
@@ -144,12 +155,12 @@ function writeArtifacts(dir, compliance, namespace) {
 }
 
 if (require.main === module) {
-  const { file, namespace, rpm, fillScale, writeDir } = parseArgs();
+  const { file, namespace, rpm, fillScale, pageSizeKB, costPerGB, writeDir } = parseArgs();
   if (!file) {
-    console.error('usage: node examples/site-report.js access.log [--namespace ns] [--rpm 15] [--fill-scale 50] [--write-dir out]');
+    console.error('usage: node examples/site-report.js access.log [--namespace ns] [--rpm 15] [--fill-scale 50] [--page-kb 2500] [--cost-per-gb 0.09] [--write-dir out]');
     process.exit(1);
   }
-  const { text, compliance } = buildReport(file, { namespace, rpm, fillScale });
+  const { text, compliance } = buildReport(file, { namespace, rpm, fillScale, pageSizeKB, costPerGB });
   console.log(text);
   if (writeDir) writeArtifacts(writeDir, compliance, namespace);
 }

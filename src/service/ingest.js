@@ -17,7 +17,13 @@
  */
 
 const crypto = require('node:crypto');
-const { classify, crawlIntent, revenueImpact, valueExchange } = require('../engine/index.js');
+const {
+  classify,
+  crawlIntent,
+  revenueImpact,
+  valueExchange,
+  bandwidthImpact,
+} = require('../engine/index.js');
 
 /** In-memory store: namespace -> Array<{category, purpose, ppr, confidence, at}> */
 const buckets = new Map();
@@ -75,8 +81,11 @@ function reportDigest(report) {
  * @param {string} namespace
  * @param {number} rpm - site revenue per 1,000 monetized impressions
  * @param {number} [fillScale] - 0..100, how much bot traffic monetizes (default 50)
+ * @param {object} [opts]
+ * @param {number} [opts.pageSizeKB=2500]
+ * @param {number} [opts.costPerGB=0.09]
  */
-function aggregate(namespace, rpm, fillScale = 50) {
+function aggregate(namespace, rpm, fillScale = 50, opts = {}) {
   const entries = buckets.get(namespace) || [];
   const byCategory = {};
   const crawlers = {};
@@ -125,6 +134,7 @@ function aggregate(namespace, rpm, fillScale = 50) {
     },
     impact: revenueImpact(summary, rpm, { botFillScale: fillScale / 100 }),
     valueExchange: valueExchange(entries),
+    bandwidth: bandwidthImpact(entries, { pageSizeKB: opts.pageSizeKB, costPerGB: opts.costPerGB }),
     generatedAt: new Date().toISOString(),
   };
   return { ...report, digest: reportDigest(report) };

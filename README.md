@@ -27,9 +27,12 @@ BotTollbooth is the visibility layer for the rest of the internet:
 - **Fair** — MIT core, runs anywhere, built for the site owners who are
   being overcharged for answers they should already have.
 
-Zero runtime dependencies. One small engine. A demo, a CLI, and a
+Zero runtime dependencies. One small engine. A demo, a CLI, an SDK, and a
 self-hostable API that turn your own access logs into answers **and** into
-regulatory deliverables (CoMP / EU AI-act robot policies and disclosures).
+regulatory deliverables (CoMP / EU AI-act robot policies and disclosures) —
+including the **bandwidth cost** the AI crawlers quietly add to your hosting
+bill, and a **browser probe** that flags headless shells by client signals
+that access logs alone can't show.
 
 ![BotTollbooth live demo](docs/screenshot.png)
 
@@ -40,17 +43,22 @@ regulatory deliverables (CoMP / EU AI-act robot policies and disclosures).
 [Open the interactive demo](https://jweezy119.github.io/bottollbooth/) — runs
 entirely in your browser. Start from a real-world profile (Local Business,
 E-commerce, Editorial) built on 2026 crawler data, tune the mix and RPM, and
-update four live panels:
+live-update the panels:
 
 1. **Traffic mix** — humans vs AI crawlers / search / monitors / spam.
 2. **Crawl Purpose & Value Exchange** — how many visitors each crawl type
    actually returns (ClaudeBot ≈ 38,000:1, GPTBot ≈ 1,091:1, Google ≈ 5.4:1).
-3. **CoMP / EU Opt-out & Disclosure** — generated `robots.txt`, opt-out list,
+3. **Bandwidth & Cost Impact** — egress dollars the crawlers burn, with the
+   AI-training share broken out separately.
+4. **CoMP / EU Opt-out & Disclosure** — generated `robots.txt`, opt-out list,
    and NTM disclosure, copy-paste ready.
-4. **Revenue impact** — conservative, defensible ad-revenue estimates.
+5. **Session Probe** — what the embeddable `probe.js` reports for *your* 
+   browser (webdriver, software renderer, sensors).
+6. **Revenue impact** — conservative, defensible ad-revenue estimates.
 
-**Copy Report Link** reproduces the exact same dataset on any device — the
-share-link encodes the traffic mix, not a screenshot.
+**Download JSON Report** grabs the full dataset; **Copy Report Link**
+reproduces the exact same dataset on any device (the link encodes the mix,
+not a screenshot).
 
 ## Quick start (no install)
 
@@ -60,6 +68,19 @@ node examples/demo.js --rpm 15    # CLI report for a simulated site
 ```
 
 No `npm install` is required anywhere in this repo — plain Node.js (>=18).
+
+## Use it as a library (SDK)
+
+```js
+const bt = require('./src/sdk');               // zero-dependency, in-repo
+
+const { rows } = bt.parseLog(accessLogText);
+const report = bt.score(rows, { rpm: 15 });   // summary + value exchange + bandwidth
+console.log(report.bandwidth.bandwidthCostUSD);
+
+const compliance = bt.compliance(report.crawlers);
+console.log(compliance.robotsTxt);            // ready to deploy
+```
 
 ## Score your real traffic (bring your own data)
 
@@ -81,6 +102,10 @@ node examples/site-report.js access.log --namespace shop.example.com \
   --write-dir out/     # → robots.txt, opt-outs.json, disclosure.json/.txt
 ```
 
+The report now includes the **bandwidth & cost impact** section (bot MB
+delivered, egress cost, AI-training share) — assumptions adjustable with
+`--page-kb` and `--cost-per-gb`.
+
 ## Deploy the API
 
 ```bash
@@ -90,18 +115,40 @@ curl http://localhost:8080/health   # {"status":"ok"}
 ```
 
 The container is a Node 22 Alpine image, runs as a non-root user, and carries
-a healthcheck. The dashboard is a static file (`index.html`) — it calls the
-same engine in-browser, so nothing else is needed to explore.
+a healthcheck. Set `BOTTOLLBOOTH_TOKEN` to require
+`Authorization: Bearer <token>` on every `/api/v1/*` endpoint (write and read
+alike); `/health` and `/probe.js` stay open. Security headers (nosniff,
+frame-deny, referrer policy) are applied to every response.
+The dashboard is a static file (`index.html`) — it calls the same engine
+in-browser with a CSP, so nothing else is needed to explore.
 
 ## HTTP API
 
 | Endpoint | What it does |
 | --- | --- |
 | `POST /api/v1/ingest` | Accepts request rows (`userAgent`, burst rate) for the given `?namespace=` |
-| `GET /api/v1/report?namespace=x&rpm=15` | Traffic mix, value exchange, revenue impact, sha256 digest |
+| `POST /api/v1/probe` | One headless/sensor signal from the browser probe (`{namespace, userAgent, signals}`) |
+| `GET /api/v1/report?namespace=x&rpm=15` | Traffic mix, value exchange, bandwidth cost, revenue impact, sha256 digest |
 | `GET /api/v1/compliance?namespace=x` | Generated `robots.txt`, opt-out list, CoMP/EU disclosure |
 | `GET /api/v1/classify?ua=<user-agent>` | Live lookup → `category`, `confidence`, `signal` |
+| `GET /probe.js` | Embeddable browser probe (headless / sensor client signals) |
 | `GET /health` | Liveness probe |
+
+## Headless & sensor detection (`src/probe/`)
+
+Access logs can't see what's running in the browser. Embed
+[`probe.js`](src/probe/probe.js) anywhere and it reports the client-side
+signals that separate a human browser from a headless shell:
+
+- `navigator.webdriver` (true if driven by ChromeDriver-style automation)
+- WebGL renderer string resolved to a software fallback (SwiftShader /
+  llvmpipe — headless, VMs, and CI)
+- `navigator.plugins.length` (0 in a headless shell)
+- Generic Sensor / Battery API presence
+
+Those signals feed the same classifier — a probe-hit surfaces as
+`probe:webdriver` / `probe:softwareRenderer`, the exact signal ready for
+escalation, not a black-box ban.
 
 ## Architecture
 
@@ -145,11 +192,12 @@ user-adjustable). SMB owners get a defensible number instead of a scare.
 
 | Skill | Where it lives |
 | --- | --- |
-| **API & data integration** | `src/service/` — ingest pipeline, aggregation, HTTP API consumed by the dashboard |
+| **API & data integration** | `src/service/`, `src/sdk/` — ingest pipeline, aggregation, HTTP API + zero-dependency client SDK |
 | **Identity & classification** | `src/engine/` — "who is this request, is it real, how confident are we" applied to web traffic |
 | **Applied AI / regulatory engineering** | CoMP + EU AI-act compliance layer: robots.txt, opt-outs, tamper-evident NTM disclosure from raw logs |
-| **Security-minded tooling** | deterministic report digests, tamper-detection, non-root container, healthchecked deployment |
-| **Product & B2B framing** | revenue-impact modelling and docs aimed at non-technical site owners ([docs/monetization.md](docs/monetization.md)) |
+| **Security-minded tooling** | token-gated API, security headers, CSP demo, deterministic report digests, non-root container |
+| **Browser-telemetry engineering** | `src/probe/` — headless / sensor client-signal collection into the same transparent classifier |
+| **Product & B2B framing** | bandwidth-cost + revenue-impact modelling, pricing tiers, docs for non-technical owners ([docs/monetization.md](docs/monetization.md)) |
 | **Documentation & strategy** | [docs/architecture.md](docs/architecture.md), [docs/strategy.md](docs/strategy.md) — competition, north stars, web3 roadmap |
 
 ## Project docs
@@ -164,8 +212,9 @@ user-adjustable). SMB owners get a defensible number instead of a scare.
   notarized over time (strategy Tier 1).
 - **Crawler/agent identity registry** — credentialed identities for the
   purpose metadata, opening an app-store-style trust layer.
-- **Managed multi-tenant service** — flat, fair pricing for agencies running
-  many client sites; single flat-rate container for everyone else.
+- **Managed multi-tenant service** — the `$9`/`$79` tiers suggested on the
+  demo: hosted ingest + probe endpoint, token-protected API, and white-label
+  agency reports.
 
 ## License & author
 

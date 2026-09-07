@@ -56,6 +56,11 @@ assert.ok(!complianceRt.includes('bingbot'));
 const disc = ntmDisclosure(report.crawlers, { namespace: NS, reportDigest: report.digest });
 assert.ok(disc.text.includes(report.digest), 'disclosure chains the report digest');
 
+// bandwidth model rides along in the report
+assert.strictEqual(report.bandwidth.requests, 6);
+assert.strictEqual(report.bandwidth.botRequests, 4);
+assert.strictEqual(report.bandwidth.trainingRequests, 1);
+
 let threw = false;
 try { ingest('', []); } catch { threw = true; }
 assert.ok(threw, 'ingest must require a namespace');

@@ -27,6 +27,7 @@ jobs:
           node examples/site-report.js examples/fixtures/access.log --namespace shop.example.com --write-dir /tmp/btb-out >/dev/null
           grep -q "User-agent: GPTBot" /tmp/btb-out/robots.txt
           grep -q '"verdict"' /tmp/btb-out/opt-outs.json
+          node examples/site-report.js examples/fixtures/access.log --namespace shop.example.com | grep -q "5. Bandwidth & cost impact"
       - name: Boot analytics service and hit the API
         run: |
           node src/service/server.js & API_PID=$!
@@ -38,8 +39,19 @@ jobs:
           curl -fsS "http://localhost:8080/api/v1/report?namespace=shop.example.com&rpm=15" | grep -q '"valueExchange"'
           curl -fsS "http://localhost:8080/api/v1/report?namespace=shop.example.com&rpm=15" | grep -q '"digest"'
           curl -fsS "http://localhost:8080/api/v1/report?namespace=shop.example.com&rpm=15" | grep -q '"crawlers"'
+          curl -fsS "http://localhost:8080/api/v1/report?namespace=shop.example.com&rpm=15" | grep -q '"bandwidth"'
           curl -fsS "http://localhost:8080/api/v1/compliance?namespace=shop.example.com" | grep -q '"robotsTxt"'
           curl -fsS "http://localhost:8080/api/v1/compliance?namespace=shop.example.com" | grep -q 'User-agent: GPTBot'
+          curl -fsS http://localhost:8080/probe.js | grep -q 'BotTollboothProbe'
+          kill $API_PID
+      - name: Verify token-gated API
+        run: |
+          BOTTOLLBOOTH_TOKEN=ci-secret node src/service/server.js & API_PID=$!
+          sleep 2
+          code=$(curl -s -o /dev/null -w '%{http_code}' "http://localhost:8080/api/v1/classify?ua=Bytespider")
+          if [ "$code" != "401" ]; then echo "expected 401 without token, got $code"; exit 1; fi
+          curl -fsS -H "Authorization: Bearer ci-secret" "http://localhost:8080/api/v1/classify?ua=Bytespider" | grep -q 'ai-crawler'
+          curl -fsS http://localhost:8080/health >/dev/null
           kill $API_PID
       - name: Build container image
         run: docker build -t bottollbooth:ci .

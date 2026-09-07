@@ -103,4 +103,23 @@ assert.ok(!demoRt.includes('User-agent: Googlebot'));
 assert.ok(sandbox.ntmDisclosure(cc).includes('NTM / EU AI-act disclosure') || sandbox.ntmDisclosure(cc).includes('CoMP'));
 assert.ok(sandbox.optOutList(cc).length > 0);
 
+// probe / headless detection inline
+assert.strictEqual(sandbox.probeHints({ webdriver: true, pluginsCount: 0 }).score, 4);
+assert.strictEqual(sandbox.classify({ userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/126 Safari/537.36', webdriver: true }).category, 'spam');
+assert.strictEqual(sandbox.classify({ userAgent: 'Mozilla/5.0 Chrome/126', pluginsCount: 0, softwareRenderer: true }).category, 'spam');
+
+// bandwidth impact inline
+const bw = sandbox.bandwidthImpact(rows);
+assert.ok(bw.botRequests > 0, 'bandwidth sees bot requests');
+assert.strictEqual(typeof bw.bandwidthCostUSD, 'number');
+assert.ok(bw.trainingRequests > 0, 'ecommerce profile has AI training crawl traffic');
+
+// new UI markers / behaviors
+const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
+assert.ok(html.includes('id="bw-body"'), 'bandwidth panel present');
+assert.ok(html.includes('id="probe-live"'), 'probe panel present');
+assert.ok(html.includes('id="downloadBtn"'), 'download report button present');
+assert.ok(html.includes('plan featured'), 'pricing section present');
+assert.ok(html.includes('bw-body') && html.includes('bw-summary'));
+
 console.log('demo.test.js: all assertions passed.');

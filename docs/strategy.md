@@ -282,6 +282,10 @@ that reinforces transparency instead of replacing substance with rails.
   `ntmDisclosure()` in the engine, `/api/v1/compliance` in the service,
   `--write-dir` on `site-report.js`, and a "CoMP / EU Opt-out & Disclosure"
   demo panel. Remaining: credentialed registry (NS 2), anchored audit logs.
+  This round also shipped the **creator/monetization frame** on the demo
+  (Free / Managed API $9 / Agency $79), the **bandwidth-cost impact** layer,
+  the **headless & sensor probe** (`src/probe/`), and the zero-dependency
+  **SDK** (`src/sdk/`) + hardened API (Bearer-token gate, security headers).
 
 Each layer is shipped open and self-hostable, grows the portfolio with
 verifiable artifacts, and never requires asking for permission or capital.

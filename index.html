@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>BotTollbooth — Live Demo</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; script-src 'self' 'unsafe-inline'; connect-src 'none'; frame-ancestors 'none'">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
   :root {
@@ -226,6 +226,23 @@
   .comp-hdr span { font-weight: 500; color: var(--text); }
   .comp-pre { margin: 0; padding: 10px; font-size: 0.72em; line-height: 1.45; white-space: pre-wrap; word-break: break-word; color: var(--muted); max-height: 220px; overflow: auto; }
   td .pill.dot { font-size: 0.75em; margin-right: 2px; }
+
+  .note-line { margin-top: 10px; color: var(--subtle); font-size: 0.76em; line-height: 1.5; }
+  .probe-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 12px; }
+  @media (max-width: 768px) { .probe-cols { grid-template-columns: 1fr; } }
+  .probe-live, .probe-code { border: 1px solid var(--border-light); border-radius: 8px; overflow: hidden; }
+  .probe-hdr { padding: 8px 10px; background: rgba(255,255,255,0.03); border-bottom: 1px solid var(--border-light); font-size: 0.8em; color: var(--muted); }
+  .probe-hdr em { font-style: normal; color: var(--subtle); }
+  #probe-live { padding: 10px; font-size: 0.78em; color: var(--text); line-height: 1.7; }
+  #probe-live b { color: var(--accent); }
+  #probe-snippet { margin: 0; padding: 10px; font-size: 0.72em; line-height: 1.45; white-space: pre-wrap; color: var(--muted); }
+  .pricing-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-top: 14px; }
+  @media (max-width: 768px) { .pricing-grid { grid-template-columns: 1fr; } }
+  .plan { border: 1px solid var(--border-light); border-radius: 10px; padding: 16px; background: var(--surface-alt); }
+  .plan.featured { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+  .plan-name { font-weight: 600; color: var(--text); font-size: 0.9em; }
+  .plan-price { font-size: 1.7em; font-weight: 700; color: var(--accent); margin: 6px 0 10px; }
+  .plan ul { margin: 0; padding-left: 18px; color: var(--subtle); font-size: 0.8em; line-height: 1.7; }
 </style>
 </head>
 <body>
@@ -334,6 +351,7 @@
 
   <div class="share-row">
     <button class="btn-small" id="shareLink">🔗 Copy Report Link</button>
+    <button class="btn-small" id="downloadBtn">⬇️ Download JSON Report</button>
     <span class="share-note" id="shareNote"></span>
   </div>
 </div>
@@ -372,6 +390,42 @@
     <tbody id="ve-body"></tbody>
   </table>
   <div class="ve-summary" id="ve-summary"></div>
+</div>
+
+<!-- BANDWIDTH -->
+<div class="panel">
+  <div class="panel-title">📦 Bandwidth &amp; Cost Impact</div>
+  <div class="panel-desc">Every bot request still <strong>costs you bandwidth</strong>. This is the egress + CDN bill the crawlers quietly add to your hosting, with the AI-training share broken out separately.</div>
+  <table class="cat-table">
+    <thead><tr><th>Metric</th><th id="bw-th">Bot traffic</th><th>AI-training crawlers only</th></tr></thead>
+    <tbody id="bw-body"></tbody>
+  </table>
+  <div class="ve-summary" id="bw-summary"></div>
+  <div class="note-line" id="bw-assumptions"></div>
+</div>
+
+<!-- PROBE -->
+<div class="panel">
+  <div class="panel-title">🎯 Session Probe (Headless &amp; Sensor Detection)</div>
+  <div class="panel-desc">Server logs can't see everything. Embed a tiny <strong>probe.js</strong> in a page and it reports client-side signals — <code>navigator.webdriver</code>, software (SwiftShader) WebGL renderer, plugin count, and sensor APIs — so headless shells and virtualised scrapers get flagged that a UA-only scan would miss.</div>
+  <div class="probe-cols">
+    <div class="probe-live">
+      <div class="probe-hdr">Signals <em>this</em> browser reports</div>
+      <div id="probe-live"></div>
+    </div>
+    <div class="probe-code">
+      <div class="probe-hdr">Integrate — 4 lines</div>
+      <pre id="probe-snippet">&lt;script src="https://your-api/probe.js"&gt;&lt;/script&gt;
+&lt;script&gt;
+  const s = BotTollboothProbe.collect();
+  fetch('/api/v1/probe', { method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ namespace:'mysite.com',
+      userAgent: navigator.userAgent, signals: s }) });
+&lt;/script&gt;</pre>
+    </div>
+  </div>
+  <div class="note-line">Probe signals feed the same classifier as UA signatures — see <code>probe:webdriver</code> / <code>probe:softwareRenderer</code> in the engine.</div>
 </div>
 
 <!-- COMPLIANCE -->
@@ -425,6 +479,45 @@
   <div class="request-log" id="log"></div>
 </div>
 
+<!-- PRICING / CTA -->
+<div class="panel pricing">
+  <div class="panel-title">How the creators of this actually make money</div>
+  <div class="panel-desc">Transparency is the product and the pricing model. The classification core, the CLI, the SDK, and <code>/probe.js</code> stay free and open forever. Revenue comes only from the parts that cost us to run:</div>
+  <div class="pricing-grid">
+    <div class="plan">
+      <div class="plan-name">Free / Open Core</div>
+      <div class="plan-price">$0</div>
+      <ul>
+        <li>Engine + CLI + SDK + probe</li>
+        <li>Self-host the API (BYO server)</li>
+        <li>Portable reports &amp; sha256 digests</li>
+        <li>Compliance generator (robots.txt / EU disclosure)</li>
+      </ul>
+    </div>
+    <div class="plan featured">
+      <div class="plan-name">Managed API</div>
+      <div class="plan-price">$9/mo</div>
+      <ul>
+        <li>Hosted ingest + probe endpoint</li>
+        <li>Unlimited namespaces (1 site)</li>
+        <li>Token-protected API &amp; audit log</li>
+        <li>Email support</li>
+      </ul>
+    </div>
+    <div class="plan">
+      <div class="plan-name">Agency</div>
+      <div class="plan-price">$79/mo</div>
+      <ul>
+        <li>Up to 25 client sites</li>
+        <li>White-label reports</li>
+        <li>Automated compliance packs per client</li>
+        <li>Priority support</li>
+      </ul>
+    </div>
+  </div>
+  <div class="note-line">Same engine as this demo — nothing is gated or watered down in the free tier.</div>
+</div>
+
 <p class="footer">BotTollbooth — transparent traffic intelligence for the open web · Open source core · <a href="https://github.com/jweezy119/bottollbooth">GitHub</a> · MIT License · Syed Jawad Hussain</p>
 
 </div>
@@ -453,13 +546,23 @@ var UA_RULES=[
   {c:'spam',p:/\bpython-requests\b/i},{c:'spam',p:/\bwget\/\b/i}
 ];
 
+function probeHints(r){
+  var s=[];
+  if(r.webdriver===true)s.push('webdriver');
+  if(r.softwareRenderer===true)s.push('softwareRenderer');
+  if(r.pluginsCount===0)s.push('zeroPlugins');
+  var sc=s.indexOf('webdriver')>=0?4:(s.indexOf('softwareRenderer')>=0?3:(s.indexOf('zeroPlugins')>=0?2:0));
+  return{score:sc,signals:s};
+}
+
 function classify(r){
   var ua=r.userAgent||'';
   for(var i=0;i<UA_RULES.length;i++){
     if(UA_RULES[i].p.test(ua))return{category:UA_RULES[i].c,confidence:0.92,signal:'ua:'+UA_RULES[i].c};
   }
-  var b=r.behaviourScore||0,rps=r.requestsPerMin||0;
+  var b=r.behaviourScore||0,rps=r.requestsPerMin||0,pr=probeHints(r);
   if(!ua||ua.length<12)return{category:'unclassified',confidence:0.4,signal:'ua:empty'};
+  if(pr.score>=3)return{category:'spam',confidence:0.88,signal:'probe:'+pr.signals.join('+')};
   if(b>=9)return{category:'spam',confidence:0.85,signal:'behav:high'};
   if(rps>60)return{category:'spam',confidence:0.78,signal:'rate:burst'};
   return{category:'human',confidence:0.9,signal:'behav:human'};
@@ -521,6 +624,20 @@ function valueExchange(rows){
     if(typeof c.ppr==='number'&&c.ppr>0){returned+=1/c.ppr;byReturn[c.purpose]+=1/c.ppr;}
   }
   return{automatedRequests:automated,byPurpose:byPurpose,byReturn:byReturn,estimatedReferralsReturned:returned,pagesPerReferral:automated>0&&returned>0?automated/returned:null};
+}
+
+function bandwidthImpact(rows,opts){
+  var pageKB=opts&&opts.pageSizeKB?opts.pageSizeKB:2500,cost=opts&&opts.costPerGB?opts.costPerGB:0.09;
+  var bot=0,train=0,c;
+  for(var i=0;i<rows.length;i++){
+    c=classify(rows[i]).category;
+    if(c==='human')continue;
+    bot++;
+    var m=crawlIntent(rows[i].userAgent);
+    if(m&&m.purpose==='training')train++;
+  }
+  var mb=function(n){return n*pageKB/1024;},usd=function(m){return m/1024*cost;};
+  return{requests:rows.length,botRequests:bot,botMB:Math.round(mb(bot)*100)/100,bandwidthCostUSD:Math.round(usd(mb(bot))*10000)/10000,trainingRequests:train,trainingMB:Math.round(mb(train)*100)/100,trainingCostUSD:Math.round(usd(mb(train))*10000)/10000,assumptions:['page ~'+pageKB+' KB delivered per request','egress cost ~$'+cost+' per GB','each request = one page delivered']};
 }
 
 function recommendCrawler(meta){
@@ -778,6 +895,27 @@ function render(){
   document.getElementById('comp-robots').textContent=STATE.robotsTxt;
   document.getElementById('comp-disp').textContent=STATE.disclosureText;
 
+  // Bandwidth & cost
+  var bw=bandwidthImpact(STATE.rows);
+  STATE.bandwidth=bw;
+  var bwRows=[
+    ['Requests served',bw.botRequests,bw.trainingRequests],
+    ['Data delivered',bw.botMB.toFixed(1)+' MB',bw.trainingMB.toFixed(1)+' MB'],
+    ['Cost (egress @$0.09/GB)','$'+bw.bandwidthCostUSD.toFixed(4),'$'+bw.trainingCostUSD.toFixed(4)]
+  ];
+  var bwHtml='';
+  for(var bi=0;bi<bwRows.length;bi++){
+    bwHtml+='<tr><td><strong>'+bwRows[bi][0]+'</strong></td><td>'+bwRows[bi][1]+'</td><td style="color:var(--muted)">'+bwRows[bi][2]+'</td></tr>';
+  }
+  document.getElementById('bw-body').innerHTML=bwHtml;
+  document.getElementById('bw-summary').innerHTML=
+    '<span>Bots deliver ≈ <strong>'+bw.botMB.toFixed(1)+' MB</strong> per sample</span>'
+    +'<span>AI-training crawlers alone: <strong>'+bw.trainingMB.toFixed(1)+' MB</strong> (~$'+bw.trainingCostUSD.toFixed(4)+')</span>';
+  document.getElementById('bw-assumptions').textContent='Assumptions: '+bw.assumptions.join(' · ');
+
+  // Probe — the live browser's client-side signals (headless detection)
+  renderProbe();
+
   // Request log
   var logHtml='';
   var last25=STATE.rows.slice(-25).reverse();
@@ -927,6 +1065,52 @@ document.getElementById('classifyBtn').addEventListener('click',function(){
 document.getElementById('customUA').addEventListener('keydown',function(e){
   if(e.key==='Enter')document.getElementById('classifyBtn').click();
 });
+
+// Downloadable JSON report
+document.getElementById('downloadBtn').addEventListener('click',function(){
+  var s=summarize(STATE.rows);
+  var report={
+    tool:'bottollbooth',
+    generatedAt:new Date().toISOString(),
+    profile:STATE.profile,
+    period:STATE.period,
+    sampleSize:STATE.rows.length,
+    summary:s,
+    impact:revenueImpact(s,STATE.rpm,STATE.fillScale),
+    valueExchange:valueExchange(STATE.rows),
+    bandwidth:STATE.bandwidth,
+    crawlers:crawlerCounts(STATE.rows)
+  };
+  var blob=new Blob([JSON.stringify(report,null,2)],{type:'application/json'});
+  var a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='bottollbooth-report-'+STATE.profile+'.json';
+  document.body.appendChild(a);a.click();document.body.removeChild(a);
+});
+
+// Probe: report the real browser's client-side signals into the demo panel
+function renderProbe(){
+  var s=(typeof BotTollboothProbe!=='undefined'&&BotTollboothProbe.collect)?BotTollboothProbe.collect():null;
+  var el=document.getElementById('probe-live');
+  if(!s){
+    el.innerHTML='<span style="color:var(--subtle)">Probe not running in this preview — integrate <code>probe.js</code> (right) to collect real signals.</span>';
+    return;
+  }
+  var verdict=probeHints(s);
+  var rows='';
+  var flags=[['webdriver',s.webdriver],['softwareRenderer',s.softwareRenderer],['pluginsCount',s.pluginsCount],['AccelerometerSensor',s.hasAccelerometer],['GyroscopeSensor',s.hasGyroscope],['BatteryAPI',s.hasBattery]];
+  for(var i=0;i<flags.length;i++){
+    var ok=flags[i][1]===true||(typeof flags[i][1]==='number'&&flags[i][1]>0);
+    rows+='<div><b style="color:'+(ok?'#2e7d32':'#c62828')+'">'+(ok?'✓':'✗')+'</b> '+flags[i][0]+': <code>'+String(flags[i][1])+'</code></div>';
+  }
+  rows+='<div style="margin-top:6px">Classifier inference: <span class="pill '+(verdict.score>=3?'spam':(verdict.score? 'spam':'human'))+'">'+(verdict.score>=3?('probe:'+verdict.signals.join('+')): 'human (clean)')+'</span></div>';
+  el.innerHTML=rows;
+}
+// If the actual probe is present on this page, use it; otherwise fall back
+// to a neutral demonstration so the panel still teaches the concept.
+if(typeof BotTollboothProbe==='undefined'){
+  window.BotTollboothProbe={collect:function(){return{webdriver:false,softwareRenderer:false,pluginsCount:22,hasAccelerometer:true,hasGyroscope:true,hasBattery:true};}};
+}
 
 // Initial render (restores a shared report if the URL carries a #hash)
 applyHash();

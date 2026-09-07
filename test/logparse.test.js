@@ -8,7 +8,7 @@
 const assert = require('node:assert');
 const fs = require('node:fs');
 const path = require('node:path');
-const { parseAccessLine, rowsFromLog } = require('../examples/accesslog-to-ingest.js');
+const { parseAccessLine, rowsFromLog } = require('../src/logparse/index.js');
 
 // combined format: ip - - [date] "req" 200 bytes "referer" "user-agent"
 const combined = parseAccessLine(

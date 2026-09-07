@@ -46,6 +46,17 @@ The repo ships a ready container image, so one modest VPS can host many
 tenant sites cheaply: our infrastructure cost stays near zero, which is
 exactly why the managed tier's price can stay honest.
 
+The demo page carries the concrete tiers (Creator frames — "how we profit"):
+
+- **Free / Open Core — $0.** Engine, CLI, SDK, probe, self-host the API,
+  portable reports + digests, compliance generator. Nothing gated.
+- **Managed API — $9/mo.** Hosted ingest + probe endpoint, token-protected
+  API, audit log, one site, email support.
+- **Agency — $79/mo.** Up to 25 client sites, white-label reports,
+  automated per-client compliance packs, priority support.
+
+Same engine in every tier — we sell hosting and support, not dark features.
+
 ### 3. Agency layer
 Many marketing agencies already manage dozens of client sites. A multi-tenant
 dashboard + scheduled reports + alerting ("This client's bot rate jumped to

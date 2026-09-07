@@ -158,6 +158,51 @@ has a `--write-dir` flag that drops `robots.txt`, `opt-outs.json`,
 same output as the **CoMP / EU Opt-out & Disclosure** panel with one-click
 copy.
 
+## Bandwidth & cost impact
+
+The frames a site owner needs are **revenue** (what bots steal) and **cost**
+(what bots cost). `bandwidthImpact(rows, opts)` adds the cost side:
+
+```
+botMB  = botRequests × pageSizeKB / 1024
+cost   = botMB / 1024 × costPerGB
+```
+
+Defaults (`pageSizeKB: 2500`, `costPerGB: 0.09`) are published assumptions,
+overridable via `--page-kb` / `--cost-per-gb` on `site-report.js` or the
+`aggregate(namespace, rpm, fillScale, { pageSizeKB, costPerGB })` options.
+Training-crawler traffic is broken out so the "AI crawlers' bill" is visible
+separately. The bandwidth block rides in every report and digest.
+
+## Headless & sensor detection (probe)
+
+Access-log UAs miss the client side, so `src/probe/probe.js` is an
+embeddable IIFE that reports the signals separating real browsers from
+headless shells: `navigator.webdriver`, the WebGL renderer string (software
+fallbacks = SwiftShader/llvmpipe point to headless / VM / CI), plugin count,
+and Generic Sensor / Battery API presence. The engine folds these into
+`classify()` via `probeHints(row)` — so `POST /api/v1/probe` yields the same
+transparent `category` + `signal` answers as any UA (`probe:webdriver`,
+`probe:softwareRenderer`), ready for escalation rather than a black-box ban.
+
+## SDK & log parsing
+
+`src/logparse/` owns the combined-format parser and per-IP 60s burst
+computation (moved out of the CLI so library users can reuse it).
+`src/sdk/index.js` wraps engine + parser into `bt.parseLog`, `bt.score`, and
+`bt.compliance`, mirroring the service report shape — the demo and CLI use
+the same pure functions, only inlined.
+
+## Security posture
+
+- `BOTTOLLBOOTH_TOKEN` gates every `/api/v1/*` endpoint (write and read) via
+  `Authorization: Bearer <token>`; `/health` and `/probe.js` stay open.
+- Every response carries `X-Content-Type-Options: nosniff`,
+  `X-Frame-Options: DENY`, and `Referrer-Policy: same-origin`.
+- The demo ships with a CSP meta tag and zero network calls.
+- No PII is stored (classification counts only), so a breach leaks no data,
+  and the container runs as a non-root user.
+
 ## The container
 
 `Dockerfile` builds on `node:22-alpine` — **no build step and no `npm

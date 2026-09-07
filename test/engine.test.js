@@ -13,6 +13,8 @@ const {
   summarize,
   valueExchange,
   revenueImpact,
+  bandwidthImpact,
+  probeHints,
   recommendCrawler,
   robotTxt,
   optOutList,
@@ -110,5 +112,30 @@ assert.ok(disc.text.includes('GPTBot'));
 assert.strictEqual(disc.json.namespace, 'shop.example.com');
 assert.strictEqual(disc.json.crawlers[0].verdict, 'opt-out');
 assert.ok(disc.json.basis.length > 20);
+
+// bandwidth + cost impact
+const bwRows = [
+  { userAgent: 'GPTBot/1.0' },
+  { userAgent: 'Mozilla/5.0 (Windows NT 10.0) Chrome/126 Safari/537.36' },
+  { userAgent: 'python-requests/2.32.3' },
+  { userAgent: 'Googlebot/2.1' },
+];
+const bw = bandwidthImpact(bwRows, { pageSizeKB: 1000, costPerGB: 0.1 });
+assert.strictEqual(bw.botRequests, 3);
+assert.ok(Math.abs(bw.botMB - (3 * 1000) / 1024) < 0.001);
+assert.strictEqual(bw.trainingRequests, 1); // only GPTBot is training
+assert.ok(bw.assumptions.length === 3);
+
+// probe / headless client signals
+assert.strictEqual(probeHints({ webdriver: true }).score, 4);
+assert.strictEqual(probeHints({ softwareRenderer: true }).score, 3);
+assert.strictEqual(probeHints({ pluginsCount: 0 }).score, 2);
+assert.strictEqual(probeHints({ webdriver: false, pluginsCount: 22 }).score, 0);
+const headless = classify({
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/999.0.0.0 Safari/537.36',
+  webdriver: true,
+});
+assert.strictEqual(headless.category, CATEGORIES.SPAM);
+assert.ok(headless.signal.startsWith('probe:'));
 
 console.log('engine.test.js: all assertions passed.');

@@ -136,7 +136,28 @@ function crawlIntent(userAgent) {
  * @property {number} [behaviourScore]  0..12 raw heuristic score (optional)
  * @property {number} [requestsPerMin]
  * @property {number} [dwellMs]
+ * @property {boolean} [webdriver]       navigator.webdriver === true (headless/automation)
+ * @property {boolean} [softwareRenderer] WebGL renderer resolved to software (SwiftShader/llvmpipe)
+ * @property {number} [pluginsCount]     navigator.plugins.length (0 = headless shell)
  */
+
+/**
+ * Rate the client-side signals gathered by the embeddable probe (src/probe/probe.js).
+ * A real human browser shows webdriver=false, a hardware GPU renderer, and plugins.
+ * Headless shells and virtualised scrapers trip at least one of these.
+ * @param {RequestRow} row
+ * @returns {{score:number, signals:string[]}}
+ */
+function probeHints(row) {
+  const signals = [];
+  if (row.webdriver === true) signals.push('webdriver');
+  if (row.softwareRenderer === true) signals.push('softwareRenderer');
+  if (row.pluginsCount === 0) signals.push('zeroPlugins');
+  const score = signals.includes('webdriver') ? 4
+    : signals.includes('softwareRenderer') ? 3
+    : signals.includes('zeroPlugins') ? 2 : 0;
+  return { score, signals };
+}
 
 /**
  * Classify a single request row into a category + confidence.
@@ -154,9 +175,13 @@ function classify(row) {
   // Behavioural fallback once UA signatures are exhausted.
   const b = row.behaviourScore ?? 0;
   const rps = row.requestsPerMin ?? 0;
+  const probe = probeHints(row);
 
   if (!ua || ua.length < 12) {
     return { category: CATEGORIES.UNCLASSIFIED, confidence: 0.4, signal: 'ua:empty' };
+  }
+  if (probe.score >= 3) {
+    return { category: CATEGORIES.SPAM, confidence: 0.88, signal: `probe:${probe.signals.join('+')}` };
   }
   if (b >= BehaviourWeights.zeroDwell + BehaviourWeights.singlePage + BehaviourWeights.headless) {
     return { category: CATEGORIES.SPAM, confidence: 0.85, signal: 'behav:high' };
@@ -215,6 +240,55 @@ function valueExchange(rows) {
     byPurpose,
     estimatedReferralsReturned: returned,
     pagesPerReferral: automated > 0 && returned > 0 ? automated / returned : null,
+  };
+}
+
+/**
+ * The bandwidth and egress-cost impact of bot traffic.
+ *
+ * Model: every request = one page delivered (pageSizeKB), each GB of egress
+ * costs costPerGB. Only bot requests are counted; training-crawler traffic is
+ * broken out separately so a site owner sees what the AI crawlers alone cost.
+ * Accepts raw request rows or stored entries (looked up by `category`).
+ *
+ * @param {Array<{userAgent?:string,category?:string,purpose?:string}>} rows
+ * @param {object} [opts]
+ * @param {number} [opts.pageSizeKB=2500] average page weight per request
+ * @param {number} [opts.costPerGB=0.09] egress/CDN cost per GB
+ * @returns {{requests:number,botRequests:number,botMB:number,bandwidthCostUSD:number,trainingRequests:number,trainingMB:number,trainingCostUSD:number,assumptions:string[]}}
+ */
+function bandwidthImpact(rows, opts = {}) {
+  const pageSizeKB = opts.pageSizeKB ?? 2500;
+  const costPerGB = opts.costPerGB ?? 0.09;
+  const isEntry = rows.length > 0 && typeof rows[0].category === 'string';
+  let botRequests = 0;
+  let trainingRequests = 0;
+  for (const r of rows) {
+    const category = isEntry ? r.category : classify(r).category;
+    if (category === CATEGORIES.HUMAN) continue;
+    botRequests += 1;
+    const purpose = r.purpose || (crawlIntent(r.userAgent) || {}).purpose;
+    if (purpose === 'training') trainingRequests += 1;
+  }
+  const mb = (n) => (n * pageSizeKB) / 1024;
+  const usd = (m) => (m / 1024) * costPerGB;
+  const botMB = mb(botRequests);
+  const trainingMB = mb(trainingRequests);
+  const round2 = (n) => Math.round(n * 100) / 100;
+  const round4 = (n) => Math.round(n * 10000) / 10000;
+  return {
+    requests: rows.length,
+    botRequests,
+    botMB: round2(botMB),
+    bandwidthCostUSD: round4(usd(botMB)),
+    trainingRequests,
+    trainingMB: round2(trainingMB),
+    trainingCostUSD: round4(usd(trainingMB)),
+    assumptions: [
+      `page ~${pageSizeKB} KB delivered per request`,
+      `egress cost ~$${costPerGB} per GB`,
+      'each request = one page delivered',
+    ],
   };
 }
 
@@ -397,8 +471,10 @@ module.exports = {
   CRAWLER_NOTES,
   classify,
   crawlIntent,
+  probeHints,
   summarize,
   valueExchange,
+  bandwidthImpact,
   recommendCrawler,
   robotTxt,
   optOutList,
