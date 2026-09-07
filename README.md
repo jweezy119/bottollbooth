@@ -55,6 +55,9 @@ live-update the panels:
 5. **Session Probe** — what the embeddable `probe.js` reports for *your* 
    browser (webdriver, software renderer, sensors).
 6. **Revenue impact** — conservative, defensible ad-revenue estimates.
+7. **Paste-a-URL Audit tab** — the client-side verdict shape for an external
+   audit (sample data in the browser; live runs via `POST /api/v1/audit` on
+   the self-hostable service).
 
 **Download JSON Report** grabs the full dataset; **Copy Report Link**
 reproduces the exact same dataset on any device (the link encodes the mix,
@@ -131,8 +134,31 @@ in-browser with a CSP, so nothing else is needed to explore.
 | `GET /api/v1/report?namespace=x&rpm=15` | Traffic mix, value exchange, bandwidth cost, revenue impact, sha256 digest |
 | `GET /api/v1/compliance?namespace=x` | Generated `robots.txt`, opt-out list, CoMP/EU disclosure |
 | `GET /api/v1/classify?ua=<user-agent>` | Live lookup → `category`, `confidence`, `signal` |
+| `POST /api/v1/audit` | Ethical external site audit (`{url}`) → bots policy, WAF, security headers, egress cost, deployable opt-out block |
+| `GET /audit` | Hosted "paste a URL" audit page (`audit.html`) |
 | `GET /probe.js` | Embeddable browser probe (headless / sensor client signals) |
 | `GET /health` | Liveness probe |
+
+## Audit a site you don't control (`src/audit/`)
+
+Paste any public URL at `GET /audit` (or run
+`node examples/audit-cli.js https://example.com`) and BotTollbooth probes it
+**like a respectful bot**: it fetches the target's `robots.txt`, then at most
+one page — and only if the target's own robots.txt allows the audit agent. It
+won't deface, won't fake an identity, and stops as soon as the site tells it
+to. The verdict shapes what a public URL can honestly tell you:
+
+- per-crawler `robots.txt` verdict (allowed / partial / blocked / unlisted)
+  for GPTBot, ClaudeBot, CCBot, PerplexityBot, Google-Extended and friends
+- WAF / CDN layer detection (Cloudflare, DataDome, CloudFront, Fastly, …)
+- security-header hygiene and an overall grade
+- one page-weight measurement extrapolated into a monthly egress cost window
+- a deployable AI-crawler opt-out block
+
+The scanner is SSRF-hardened: http(s) only, no credentials, ports 80/443,
+and any DNS answer that resolves into a private / loopback / link-local /
+CGNAT range is refused before a single byte is fetched — proven in the test
+suite. Per-host throttling sits at the API layer.
 
 ## Headless & sensor detection (`src/probe/`)
 
@@ -197,6 +223,7 @@ user-adjustable). SMB owners get a defensible number instead of a scare.
 | **Applied AI / regulatory engineering** | CoMP + EU AI-act compliance layer: robots.txt, opt-outs, tamper-evident NTM disclosure from raw logs |
 | **Security-minded tooling** | token-gated API, security headers, CSP demo, deterministic report digests, non-root container |
 | **Browser-telemetry engineering** | `src/probe/` — headless / sensor client-signal collection into the same transparent classifier |
+| **Ethical scanning / SSRF-safe crawler** | `src/audit/` — robots-respecting external audit: per-crawler bots policy, WAF/security headers, egress cost, deployable opt-out |
 | **Product & B2B framing** | bandwidth-cost + revenue-impact modelling, pricing tiers, docs for non-technical owners ([docs/monetization.md](docs/monetization.md)) |
 | **Documentation & strategy** | [docs/architecture.md](docs/architecture.md), [docs/strategy.md](docs/strategy.md) — competition, north stars, web3 roadmap |
 

@@ -479,6 +479,22 @@
   <div class="request-log" id="log"></div>
 </div>
 
+<!-- SIMULATED SITE AUDIT -->
+<div class="panel">
+  <div class="panel-title">🔍 Paste-a-URL Audit</div>
+  <div class="panel-desc">What a hosted audit returns when you paste someone else's URL — robots.txt policy for the AI crawlers, WAF / security headers, page-weight egress cost, and a deployable opt-out block. This tab renders <em>sample data locally</em>; the real thing is the <code>POST /api/v1/audit</code> endpoint on the self-hostable service (SSRF-guarded, robots-respecting).</div>
+  <div class="ctrl-row" style="align-items:center">
+    <label class="ctrl-label" for="audit-sample">Sample profile</label>
+    <select id="audit-sample" class="custom-ua" style="flex:1;min-width:220px">
+      <option value="clean">Locked-down blog (everything blocked, headers on)</option>
+      <option value="shop">E-commerce (AI crawlers broadly allowed)</option>
+      <option value="news">News publisher (mixed policy, weak headers)</option>
+    </select>
+    <button id="audit-sim-run" class="btn-small">Run sample audit</button>
+  </div>
+  <div id="audit-sim-out" class="explain"><span class="sub">Press “Run sample audit” to see the verdict shape.</span></div>
+</div>
+
 <!-- PRICING / CTA -->
 <div class="panel pricing">
   <div class="panel-title">How the creators of this actually make money</div>
@@ -1115,6 +1131,74 @@ if(typeof BotTollboothProbe==='undefined'){
 // Initial render (restores a shared report if the URL carries a #hash)
 applyHash();
 render();
+
+// --- Simulated site audit (paste-a-URL shape, sample data) ------------------
+var AUDIT_SAMPLES={
+  clean:{
+    requested:'https://lockeddown.blog',
+    host:'lockeddown.blog',
+    overall:{grade:'A',score:94},
+    tls:true,
+    robots:{ai:{'GPTBot':'blocked','ClaudeBot':'blocked','CCBot':'blocked','PerplexityBot':'blocked','Google-Extended':'blocked','Bytespider':'blocked'}},
+    waf:['cloudflare'],
+    cdn:['fastly'],
+    security:{missing:['Permissions-Policy']},
+    egress:{pageSizeKB:2200,egressPerRequestKB:2200,monthlyWindows:[{label:'100k req/day at 15%',egressGBPerMonth:9.4,costUSDPerMonth:0.85}]},
+    compliance:'# BotTollbooth audit of lockeddown.blog — already compliant.\n# AI crawlers are blocked; nothing to add.',
+    note:'Reachable · HTTPS · AI training crawlers blocked in robots.txt.'
+  },
+  shop:{
+    requested:'https://shop.company',
+    host:'shop.company',
+    overall:{grade:'D',score:52},
+    tls:true,
+    robots:{ai:{'GPTBot':'allowed','ClaudeBot':'allowed','CCBot':'allowed','PerplexityBot':'allowed','Google-Extended':'allowed','Applebot-Extended':'allowed'}},
+    waf:['datadome'],
+    cdn:[],
+    security:{missing:['Strict-Transport-Security','Content-Security-Policy','X-Frame-Options','Referrer-Policy']},
+    egress:{pageSizeKB:5200,egressPerRequestKB:5200,monthlyWindows:[{label:'100k req/day at 15%',egressGBPerMonth:22.3,costUSDPerMonth:2.01}]},
+    compliance:'# BotTollbooth audit of shop.company — add to robots.txt.\nUser-agent: GPTBot\nUser-agent: ClaudeBot\nUser-agent: CCBot\nUser-agent: PerplexityBot\nUser-agent: Google-Extended\nDisallow: /',
+    note:'Reachable · HTTPS · every major AI crawler can read the whole storefront.'
+  },
+  news:{
+    requested:'https://news.publisher',
+    host:'news.publisher',
+    overall:{grade:'C',score:66},
+    tls:true,
+    robots:{ai:{'GPTBot':'partial','ClaudeBot':'allowed','CCBot':'blocked','PerplexityBot':'allowed','Google-Extended':'partial'}},
+    waf:[],
+    cdn:['aws-cloudfront'],
+    security:{missing:['Content-Security-Policy','X-Frame-Options','Permissions-Policy']},
+    egress:{pageSizeKB:3800,egressPerRequestKB:3800,monthlyWindows:[{label:'100k req/day at 15%',egressGBPerMonth:16.3,costUSDPerMonth:1.47}]},
+    compliance:'# BotTollbooth audit of news.publisher — block the training crawlers.\nUser-agent: ClaudeBot\nUser-agent: PerplexityBot\nDisallow: /',
+    note:'Reachable · HTTPS · mixed policy — training crawlers still allowed.'
+  }
+};
+function escHtml(s){return String(s||'').replace(/[&<>]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;'}[c];});}
+function renderAuditSim(){
+  var key=document.getElementById('audit-sample').value;
+  var a=AUDIT_SAMPLES[key]||AUDIT_SAMPLES.clean;
+  var pills={'blocked':'spam','partial':'search-engine','allowed':'ai-crawler','unlisted':'unclassified'};
+  var rows='';
+  for(var t in a.robots.ai){rows+='<div class="row"><span class="ua">'+escHtml(t)+'</span><span class="pill '+pills[a.robots.ai[t]]+'">'+a.robots.ai[t]+'</span></div>';}
+  var plat=a.waf.concat(a.cdn);
+  document.getElementById('audit-sim-out').innerHTML=
+    '<div class="note-line" style="margin-top:0">SIMULATED AUDIT — sample data rendered locally. Live runs come from the hosted <code>POST /api/v1/audit</code> endpoint (SSRF-guarded, robots-respecting).</div>'+
+    '<div class="two-col"><div class="panel"><div class="panel-title">Verdict — '+escHtml(a.requested)+'</div>'+
+    '<div class="metrics"><div class="metric-card"><div class="value">'+a.overall.grade+'</div><div class="label">grade</div></div>'+
+    '<div class="metric-card"><div class="value">'+a.overall.score+'</div><div class="label">score/100</div></div></div>'+
+    '<div class="note-line">'+escHtml(a.note)+'</div>'+
+    '<div class="panel-title" style="margin-top:12px">AI crawler policy</div>'+rows+
+    (plat.length?'<div class="panel-title" style="margin-top:12px">Platform</div><div>'+plat.map(function(p){return '<span class="pill unclassified">'+escHtml(p)+'</span>';}).join(' ')+'</div>':'')+
+    '<div class="panel-title" style="margin-top:12px">Security headers</div><div>'+
+    a.security.missing.length+(a.security.missing.length===1?' missing':' missing')+' · '+escHtml(a.security.missing.join(', '))+'</div></div>'+
+    '<div class="panel"><div class="panel-title">Egress window</div>'+
+    '<div class="metrics"><div class="metric-card"><div class="value">'+a.egress.pageSizeKB.toLocaleString()+'</div><div class="label">KB / page</div></div>'+
+    '<div class="metric-card"><div class="value">$'+(a.egress.monthlyWindows[0].costUSDPerMonth||0)+'</div><div class="label">monthly bot egress</div></div></div>'+
+    '<div class="panel-title" style="margin-top:12px">Deployable opt-out block</div>'+
+    '<div class="comp-pre" style="white-space:pre-wrap;word-break:break-word">'+escHtml(a.compliance)+'</div></div></div>';
+}
+document.getElementById('audit-sim-run').addEventListener('click',renderAuditSim);
 </script>
 </body>
 </html>

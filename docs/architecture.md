@@ -193,6 +193,26 @@ computation (moved out of the CLI so library users can reuse it).
 `bt.compliance`, mirroring the service report shape — the demo and CLI use
 the same pure functions, only inlined.
 
+## External site audit (`src/audit/`)
+
+The no-logs path: an owner hands you a competitor's (or their own) URL and
+BotTollbooth probes it externally. `runAudit(url, opts)` does exactly two
+requests — `robots.txt`, then one page *only if the target's own robots.txt
+permits our agent*. `parseRobots` implements the 2026 robots spec subset we
+care about (per-token groups with multi-`User-agent:` collapsing and `*`
+fallback) and renders a verdict per AI token. `detector()` lifts WAF/CDN and
+security-header facts from the response. `egressTable()` turns one page
+weight into a monthly egress USD window. `buildCompliancePack()` emits a
+deployable opt-out block.
+
+SSRF hardening lives in `assertPublic()`: scheme allow-list (http(s)), no
+credentials, port allow-list (80/443), and every resolved DNS answer is
+checked against the private/loopback/link-local/CGNAT/reserved ranges before
+any fetch; the API adds a per-host throttle. Tests exercise the full crawl
+against a local stub via `allowPrivate: true`, plus deterministic guard
+checks. Exposed as `POST /api/v1/audit` and the hosted page `GET /audit`
+(`audit.html`).
+
 ## Security posture
 
 - `BOTTOLLBOOTH_TOKEN` gates every `/api/v1/*` endpoint (write and read) via

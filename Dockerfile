@@ -8,6 +8,7 @@ WORKDIR /app
 # Zero-dependency service: no build step, no npm install in the image.
 COPY package.json ./
 COPY --chown=node:node src ./src
+COPY --chown=node:node audit.html ./audit.html
 
 # Run as the unprivileged node user, never as root.
 USER node

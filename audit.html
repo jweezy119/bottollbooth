@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BotTollbooth — Site Audit</title>
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; connect-src 'self'; img-src 'self' data:; frame-ancestors 'none'">
+<style>
+:root{--bg:#f6f7f9;--card:#ffffff;--ink:#1a1d24;--muted:#5b6172;--line:#e3e6ee;--accent:#5046e5;--good:#0e9f6e;--warn:#d98324;--bad:#d64545}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 -apple-system,"Segoe UI",Roboto,sans-serif}
+.wrap{max-width:920px;margin:0 auto;padding:32px 20px 72px}
+.brand{display:flex;align-items:center;gap:10px;font-weight:800;font-size:18px}
+.brand .dot{width:12px;height:12px;border-radius:50%;background:var(--accent);display:inline-block}
+.subline{color:var(--muted);margin:4px 0 20px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:20px}
+.grid{display:grid;gap:12px;grid-template-columns:1fr auto}
+label{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}
+input{all:unset;box-sizing:border-box;width:100%;padding:11px 12px;border:1px solid var(--line);border-radius:9px;background:#fff;font:inherit;margin-top:6px}
+input:focus{border-color:var(--accent);box-shadow:0 0 0 2px rgba(80,70,229,.15)}
+button{cursor:pointer;border:0;border-radius:9px;padding:11px 16px;font:inherit;font-weight:700;background:var(--accent);color:#fff}
+button:disabled{opacity:.55;cursor:wait}
+.btn-ghost{background:transparent;color:var(--accent);border:1px solid var(--accent)}
+.msg{margin-top:14px;font-size:13px}
+.pill{display:inline-block;padding:2px 9px;border-radius:99px;font-size:12px;font-weight:700}
+.pill.ok{background:#e6f7f1;color:var(--good)}
+.pill.warn{background:#fdf0e2;color:var(--warn)}
+.pill.bad{background:#fdeaea;color:var(--bad)}
+.pill.mut{background:#eef0f5;color:var(--muted)}
+h2{font-size:15px;margin:28px 0 12px}
+table{width:100%;border-collapse:collapse;font-size:13px}
+td,th{border-bottom:1px solid var(--line);padding:8px 6px;text-align:left;vertical-align:top}
+td.num,th.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.score{display:flex;align-items:center;gap:14px}
+.grade{width:72px;height:72px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:34px;font-weight:800;color:#fff}
+pre{background:#0f1218;color:#d5d9e4;padding:14px;border-radius:10px;overflow-x:auto;font:12px/1.55 ui-monospace,SFMono-Regular,Menlo,monospace}
+pre.ok{background:#0b1f1a;color:#8ce0c3}
+.copy{float:right;color:var(--accent);background:transparent;border:1px solid var(--accent);padding:5px 12px;font-size:12px}
+.chip{display:inline-block;margin:3px 4px 3px 0;padding:3px 10px;border-radius:99px;font-size:12px;background:#eef0f5;color:var(--ink)}
+.missing{color:var(--bad)}
+.hidden{display:none}
+footer{margin-top:40px;color:var(--muted);font-size:12px}
+footer a{color:var(--accent)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="brand"><span class="dot"></span> BotTollbooth · Site Audit</div>
+  <p class="subline">Paste any public URL. The audit probes it like a respectful bot — robots.txt policy for the AI crawlers, WAF/security headers, page-weight &amp; egress cost, and a deployable opt-out block. It never sends credentials, never fakes identity, and stops if the site tells it to.</p>
+
+  <div class="card">
+    <div class="grid">
+      <div>
+        <label>URL to audit</label>
+        <input id="url" type="text" placeholder="https://your-site.example" value="https://example.com">
+      </div>
+      <div>
+        <label>API token <span style="text-transform:none">(Bearer; required)</span></label>
+        <input id="token" type="password" placeholder="BOTTOLLBOOTH_TOKEN" autocomplete="off">
+      </div>
+    </div>
+    <div style="margin-top:14px;display:flex;gap:10px;align-items:center">
+      <button id="run">Run audit</button>
+      <button id="clear" class="btn-ghost">Clear</button>
+      <span id="msg" class="msg"></span>
+    </div>
+  </div>
+
+  <section id="result" class="hidden">
+    <h2>Verdict</h2>
+    <div class="card">
+      <div class="score">
+        <div id="grade" class="grade" style="background:#888">?</div>
+        <div>
+          <div id="headline" style="font-weight:700"></div>
+          <div id="meta" style="color:var(--muted);font-size:13px"></div>
+        </div>
+      </div>
+      <div id="note"></div>
+    </div>
+
+    <h2>AI crawler policy in robots.txt</h2>
+    <div class="card"><div id="robots"></div></div>
+
+    <h2>Platform &amp; security</h2>
+    <div class="card"><div id="plats"></div><table id="sec"></table></div>
+
+    <h2>Bandwidth &amp; cost impact</h2>
+    <div class="card"><table id="bw"></table><div id="bw-meta" style="color:var(--muted);font-size:12px;margin-top:8px"></div></div>
+
+    <h2>Deployable opt-out block</h2>
+    <div class="card"><button class="copy" data-copy="compliance">Copy</button><pre id="compliance" class="ok"></pre></div>
+
+    <h2>From audit to live numbers (2 minutes)</h2>
+    <div class="card">
+      <pre id="steps"></pre>
+    </div>
+  </section>
+
+  <footer>Open-core engine · <a href="https://github.com/jweezy119/bottollbooth">github.com/jweezy119/bottollbooth</a> · the audit honours robots.txt for its own requests.</footer>
+</div>
+
+<script>
+(function () {
+  const $ = (id) => document.getElementById(id);
+  const token = $('token');
+  try { if (sessionStorage.getItem('btb-token')) token.value = sessionStorage.getItem('btb-token'); } catch {}
+
+  const esc = (s) => String(s || '').replace(/[&<>"']/g, (c) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+
+  function pill(v) {
+    if (v === 'blocked') return '<span class="pill bad">blocked</span>';
+    if (v === 'partial') return '<span class="pill warn">partial</span>';
+    if (v === 'allowed') return '<span class="pill ok">allowed</span>';
+    return '<span class="pill mut">unlisted</span>';
+  }
+
+  function render(a) {
+    const g = $('grade'); g.textContent = a.overall.grade; g.style.background = a.overall.score >= 75 ? '#0e9f6e' : a.overall.score >= 55 ? '#d98324' : '#d64545';
+    $('headline').textContent = `${a.requested} — ${a.reachable ? 'reachable' : 'not directly reachable'}`;
+    $('meta').textContent = `audited ${a.auditedAt.replace('T', ' ').slice(0, 19)} · score ${a.overall.score}/100 · ${a.tls ? 'HTTPS' : 'HTTP'}`;
+    $('note').textContent = a.note || '';
+
+    const entries = Object.entries(a.robots.ai || {});
+    const blocked = entries.filter(([, v]) => v === 'blocked').length;
+    const allowed = entries.filter(([, v]) => v === 'allowed').length;
+    $('robots').innerHTML = `<div style="color:var(--muted);font-size:13px;margin-bottom:8px">${allowed} fully allowed · ${blocked} blocked · ${a.robots.sitemaps.length ? a.robots.sitemaps.length + ' sitemap(s)' : 'no sitemap'}</div>` +
+      entries.map(([t, v]) => `<div style="display:flex;justify-content:space-between;border-bottom:1px solid var(--line);padding:5px 0;font-size:13px"><span>${esc(t)}</span>${pill(v)}</div>`).join('');
+
+    const plats = [...a.waf, ...a.cdn, a.platforms.find((p) => p === 'nginx' || p === 'apache')].filter(Boolean);
+    $('plats').innerHTML = (plats.length ? plats.map((p) => `<span class="chip">${esc(p)}</span>`).join('') : '<span style="color:var(--muted);font-size:13px">no platform layer detected</span>');
+
+    const secRow = (name, ok) => `<tr><td>${esc(name)}</td><td>${ok ? '<span class="pill ok">present</span>' : '<span class="missing pill bad">missing</span>'}</td></tr>`;
+    const allSec = ['Strict-Transport-Security','Content-Security-Policy','X-Content-Type-Options','X-Frame-Options','Referrer-Policy','Permissions-Policy'];
+    $('sec').innerHTML = allSec.map((k) => secRow(k, !a.security.missing.includes(k))).join('');
+
+    const e = a.egress;
+    $('bw').innerHTML = e
+      ? `<tr><td>Page weight</td><td class="num">${e.pageSizeKB} KB</td></tr>` +
+        `<tr><td>Egress per request</td><td class="num">${e.egressPerRequestKB} KB</td></tr>` +
+        `<tr><td>Cost per request</td><td class="num">$${(e.costPerRequestUSD * 1000000 / 1000000).toFixed(6)}</td></tr>` +
+        e.monthlyWindows.map((w) => `<tr><td>${esc(w.label)}</td><td class="num">${w.egressGBPerMonth} GB/mo · $${w.costUSDPerMonth}</td></tr>`).join('')
+      : '<tr><td colspan="2">no page fetched — egress estimate unavailable</td></tr>';
+    $('bw-meta').textContent = e ? e.assumptions.join(' · ') : (a.note || '');
+
+    $('compliance').textContent = a.compliance;
+    const probeTag = '<scr' + 'ipt src="http://localhost:8080/probe.js">' + '</scr' + 'ipt>';
+    $('steps').textContent = [
+      '# 1 — get real traffic numbers for this site',
+      'node examples/accesslog-to-ingest.js access.log --post http://localhost:8080 --namespace ' + a.host,
+      '',
+      '# 2 — embed the probe (headless / sensor signals)',
+      probeTag,
+      '',
+      '# 3 — read the live report',
+      'curl -H "Authorization: Bearer $BOTTOLLBOOTH_TOKEN" "http://localhost:8080/api/v1/report?namespace=' + a.host + '"',
+    ].join('\n');
+  }
+
+  $('run').addEventListener('click', async () => {
+    const btn = $('run'), msg = $('msg');
+    btn.disabled = true; msg.textContent = 'auditing…';
+    $('result').classList.add('hidden');
+    const tokenVal = token.value.trim();
+    try { sessionStorage.setItem('btb-token', tokenVal); } catch {}
+    const headers = { 'Content-Type': 'application/json' };
+    if (tokenVal) headers.Authorization = `Bearer ${tokenVal}`;
+    try {
+      const res = await fetch('/api/v1/audit', { method: 'POST', headers, body: JSON.stringify({ url: $('url').value.trim() }) });
+      const data = await res.json();
+      if (!res.ok) { msg.textContent = `${res.status}: ${data.error || 'failed'}${data.message ? ' — ' + data.message : ''}`; return; }
+      render(data);
+      $('result').classList.remove('hidden');
+      msg.textContent = '';
+    } catch (err) { msg.textContent = 'request failed: ' + err.message; }
+    finally { btn.disabled = false; }
+  });
+
+  $('clear').addEventListener('click', () => { try { sessionStorage.removeItem('btb-token'); } catch {} token.value = ''; });
+  document.querySelectorAll('.copy').forEach((b) => b.addEventListener('click', async () => {
+    const text = $(b.dataset.copy).textContent;
+    try { await navigator.clipboard.writeText(text); b.textContent = 'Copied'; } catch {}
+    setTimeout(() => { b.textContent = 'Copy'; }, 1500);
+  }));
+})();
+</script>
+</body>
+</html>

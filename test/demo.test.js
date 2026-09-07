@@ -121,5 +121,11 @@ assert.ok(html.includes('id="probe-live"'), 'probe panel present');
 assert.ok(html.includes('id="downloadBtn"'), 'download report button present');
 assert.ok(html.includes('plan featured'), 'pricing section present');
 assert.ok(html.includes('bw-body') && html.includes('bw-summary'));
+assert.ok(html.includes('id="audit-sim-run"'), 'audit simulator present');
+
+// audit simulator renders locally with sample data
+sandbox.renderAuditSim();
+assert.ok(stubs.get('audit-sim-out').innerHTML.includes('SIMULATED AUDIT'), 'simulator labels itself simulated');
+assert.ok(stubs.get('audit-sim-out').innerHTML.includes('grade'), 'simulator renders a verdict');
 
 console.log('demo.test.js: all assertions passed.');

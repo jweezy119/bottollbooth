@@ -36,12 +36,17 @@ const {
   optOutList,
   ntmDisclosure,
 } = require('../engine/index.js');
+const { runAudit, AuditError } = require('../audit/index.js');
 
 const PORT = Number(process.env.PORT) || 8080;
 const DEFAULT_RPM = Number(process.env.DEFAULT_RPM) || 15;
 const AUTH_TOKEN = process.env.BOTTOLLBOOTH_TOKEN || '';
+const AUDIT_INTERVAL_MS = Number(process.env.AUDIT_INTERVAL_MS) || 5000;
 
 const PROBE_JS = fs.readFileSync(path.join(__dirname, '../probe/probe.js'), 'utf8');
+const AUDIT_HTML = fs.readFileSync(path.join(__dirname, '../../audit.html'), 'utf8');
+
+const lastAuditAt = new Map(); // host → timestamp (per-host throttle)
 
 function readBody(req) {
   return new Promise((resolve, reject) => {
@@ -98,6 +103,12 @@ const server = http.createServer(async (req, res) => {
         'Cache-Control': 'public, max-age=3600',
       });
       return res.end(PROBE_JS);
+    }
+
+    // GET /audit — hosted "paste a URL" audit page, always open
+    if (req.method === 'GET' && url.pathname === '/audit') {
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
+      return res.end(AUDIT_HTML);
     }
 
     // GET /health — liveness, always open
@@ -170,6 +181,31 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, { userAgent: ua, ...verdict });
     }
 
+    // POST /api/v1/audit  { url }  — ethical external site audit
+    if (req.method === 'POST' && url.pathname === '/api/v1/audit') {
+      let payload;
+      try { payload = await jsonBody(req); } catch { return send(res, 400, { error: 'invalid_json' }); }
+      if (!payload || typeof payload.url !== 'string' || !payload.url.trim()) {
+        return send(res, 400, { error: 'body must be { url: string }' });
+      }
+      let host = null;
+      try { host = new URL(String(payload.url).trim()).hostname.toLowerCase(); } catch { /* normalized below */ }
+      if (host) {
+        const last = lastAuditAt.get(host) || 0;
+        if (Date.now() - last < AUDIT_INTERVAL_MS) {
+          return send(res, 429, { error: 'rate_limited', retryAfterMs: AUDIT_INTERVAL_MS - (Date.now() - last) });
+        }
+      }
+      try {
+        const audit = await runAudit(payload.url, { timeoutMs: 8000 });
+        lastAuditAt.set(host, Date.now());
+        return send(res, 200, audit);
+      } catch (err) {
+        if (err instanceof AuditError) return send(res, 422, { error: err.code, message: err.message });
+        throw err;
+      }
+    }
+
     return notFound(res);
   } catch (err) {
     return send(res, 500, { error: 'internal_error', message: err.message });
@@ -180,10 +216,12 @@ server.listen(PORT, () => {
   console.log(`BotTollbooth analytics service listening on :${PORT}${AUTH_TOKEN ? ' (token-protected)' : ''}`);
   console.log(`  POST /api/v1/ingest`);
   console.log(`  POST /api/v1/probe`);
+  console.log(`  POST /api/v1/audit`);
   console.log(`  GET  /api/v1/report?namespace=<site>&rpm=15`);
   console.log(`  GET  /api/v1/compliance?namespace=<site>`);
   console.log(`  GET  /api/v1/classify?ua=<user-agent>`);
   console.log(`  GET  /probe.js`);
+  console.log(`  GET  /audit`);
   console.log(`  GET  /health`);
 });
 
